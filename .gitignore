@@ -1,0 +1,32 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# MySQL data directory
+data/mysql/
+
+# Uploads (you may want to keep thumbs/ directory structure but ignore the files)
+data/uploads/*
+!data/uploads/.gitkeep
+data/uploads/thumbs/*
+!data/uploads/thumbs/.gitkeep
+
+# Docker volumes
+*.sock
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log

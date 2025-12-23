@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gallery</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h3>Han's Family</h3>
+    <div class="header-actions">
+      <span id="userDisplay" class="header-user" style="display:none;"></span>
+      <!-- 상세정보 -->
+      <button id="toggleMetaBtn" class="header-btn" title="Show/Hide Info"><i class="fa-solid fa-circle-info"></i></button>
+      <!-- 이미지 업로드 토글 -->
+      <button id="toggleUploadBtn" class="header-btn" title="Hide Upload"><i class="fa-regular fa-square-plus"></i></button>
+      <!-- 앨범 추가 -->
+      <button id="createAlbumBtn" class="header-btn create-album-btn" style="display:none;" title="New Album"><i class="fa-solid fa-folder-plus"></i></button>
+      <!-- 관리자 대시보드 -->
+      <button id="adminDashboardBtn" class="header-btn" style="display:none;" title="Dashboard"><i class="fa-solid fa-gauge-high"></i></button>
+      <!-- 로그인/로그아웃 -->
+      <button id="loginBtn" class="header-btn" title="Login"><i class="fa-solid fa-right-to-bracket"></i></button>
+      <button id="logoutBtn" class="header-btn" style="display:none;" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </header>
+
+  <section id="adminDashboard" class="admin-dashboard" style="display:none;">
+    <h2>Admin Dashboard</h2>
+    <button class="close-dashboard-btn" onclick="closeDashboard()">✕ Close</button>
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statUsers">-</div>
+        <div class="stat-label">Users</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statImages">-</div>
+        <div class="stat-label">Images</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statAlbums">-</div>
+        <div class="stat-label">Albums</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statLikes">-</div>
+        <div class="stat-label">Likes</div>
+      </div>
+    </div>
+
+    <div class="dashboard-section">
+      <h3>Recent Images</h3>
+      <div id="recentImagesList"></div>
+    </div>
+
+    <div class="dashboard-section">
+      <h3>Users</h3>
+      <div id="usersList"></div>
+    </div>
+
+    <div class="dashboard-section">
+      <h3>Albums Management</h3>
+      <div id="albumsManagement"></div>
+    </div>
+  </section>
+
+  <section class="albums-bar">
+    <div class="albums-scroll" id="albumsList"></div>
+      <div class="sort-controls">
+        <label for="sortSelect"><i class="fa-solid fa-sort"></i></label>
+        <select id="sortSelect">
+          <option value="created_desc">Newest (Created)</option>
+          <option value="created_asc">Oldest (Created)</option>
+          <option value="taken_desc">Date Taken (Newest)</option>
+          <option value="taken_asc">Date Taken (Oldest)</option>
+          <option value="title_asc">Title (A–Z)</option>
+          <option value="title_desc">Title (Z–A)</option>
+          <option value="likes_desc">Most Liked</option>
+          <option value="likes_asc">Least Liked</option>
+        </select>
+      </div>
+    
+  </section>
+
+  <section class="upload" style="display:none;">
+    <form id="uploadForm">
+      <select id="albumSelect" name="album_id">
+        <option value="">No Album</option>
+      </select>
+      <input type="text" name="title" placeholder="Title (optional)" />
+      <input type="date" name="date_taken" placeholder="Date taken (optional)" />
+      <input type="file" name="image" accept="image/*" required />
+      <button type="submit">Upload</button>
+    </form>
+    <div id="uploadStatus"></div>
+  </section>
+
+  <section class="gallery" id="gallery"></section>
+
+  <div id="modal" class="modal">
+    <span class="modal-close">&times;</span>
+    <button class="modal-nav modal-prev" onclick="prevImage()" title="Previous">&lsaquo;</button>
+    <img class="modal-content" id="modalImg" />
+    <button class="modal-nav modal-next" onclick="nextImage()" title="Next">&rsaquo;</button>
+    <div id="modalCaption"></div>
+  </div>
+
+  <div id="loginModal" class="modal">
+    <div class="modal-box">
+      <h2>Login</h2>
+      <form id="loginForm">
+        <input type="text" id="username" placeholder="Email or admin username" required />
+        <input type="password" id="password" placeholder="Password" required />
+        <button type="submit">Login</button>
+        <button type="button" class="cancel-btn" onclick="closeLoginModal()">Cancel</button>
+      </form>
+      <div id="loginError"></div>
+      <div style="margin-top:8px; font-size: 14px;">
+        New here? <a href="#" onclick="openSignupModal(); return false;">Create an account</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="signupModal" class="modal">
+    <div class="modal-box">
+      <h2>Sign Up</h2>
+      <form id="signupForm">
+        <input type="email" id="signupEmail" placeholder="Email" required />
+        <input type="password" id="signupPassword" placeholder="Password (min 8 chars)" minlength="8" required />
+        <input type="password" id="signupPassword2" placeholder="Confirm password" minlength="8" required />
+        <button type="submit">Create Account</button>
+        <button type="button" class="cancel-btn" onclick="closeSignupModal()">Cancel</button>
+      </form>
+      <div id="signupError"></div>
+    </div>
+  </div>
+
+  <div id="createAlbumModal" class="modal">
+    <div class="modal-box">
+      <h2>Create Album</h2>
+      <form id="createAlbumForm">
+        <input type="text" id="albumName" placeholder="Album name" required />
+        <button type="submit">Create</button>
+        <button type="button" class="cancel-btn" onclick="closeCreateAlbumModal()">Cancel</button>
+      </form>
+      <div id="albumError"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
