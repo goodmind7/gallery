@@ -2,16 +2,24 @@
 body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #111; color: #eee; }
 header { padding: 16px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
 .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.mobile-menu-toggle { display: none !important; }
+.mobile-menu-overlay { display: none; }
 .header-user { color: #bbb; font-size: 14px; display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 /* .header-user::before { content: "\f2bd "; font-family: "Font Awesome 6 Free"; font-weight: 400; opacity: 0.9; } */
-.header-btn { padding: 8px 16px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.header-btn { padding: 8px 12px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
 .header-btn:hover { background: #444; }
-.albums-bar { padding: 12px 16px; border-bottom: 1px solid #333; display: flex; gap: 12px; align-items: center; overflow-x: auto; }
-.albums-scroll { display: flex; gap: 8px; overflow-x: auto; flex: 1; }
+.header-btn i { min-width: 16px; text-align: center; }
+.btn-label { display: none; }
+.albums-bar { padding: 12px 16px; border-bottom: 1px solid #333; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.albums-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.sort-section { padding: 10px 12px; } 
+.sort-bar { display: flex; justify-content: flex-end; }
+.sort-controls { display: inline-flex; align-items: center; gap: 8px; color: #ccc; font-size: 14px; }
+.sort-controls select { padding: 8px; background: #333; color: #eee; border: 1px solid #555; border-radius: 4px; }
 .album-btn { padding: 8px 16px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .album-btn:hover { background: #444; }
 .album-btn.active { background: #1e90ff; border-color: #1e90ff; }
-.create-album-btn { padding: 8px 16px; background: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.create-album-btn { background: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .create-album-btn:hover { background: #1b5e20; }
 .upload { padding: 16px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #333; }
 .upload form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -40,6 +48,38 @@ body.show-meta .card .meta { display: block; }
 .edit-btn:hover { background: #fb8c00; }
 .delete-btn { background: gray }
 .delete-btn:hover { background: #e53935; }
+
+@media (max-width: 768px) {
+  header { gap: 10px; position: sticky; top: 0; z-index: 1002; background: #111; }
+  .mobile-menu-toggle { display: inline-flex !important; align-items: center; justify-content: center; padding: 8px 12px; background: #333; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; }
+  .mobile-menu-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 1000; display: none; }
+  .header-actions {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 260px;
+    padding: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    background: #141414;
+    border-left: 1px solid #222;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 1001;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.35);
+  }
+  body.mobile-menu-open .header-actions { display: flex; transform: translateX(0); }
+  body.mobile-menu-open .mobile-menu-overlay { display: block; }
+  .header-actions .header-btn { width: 100%; text-align: left; justify-content: flex-start; }
+  .btn-label { display: inline; }
+}
+
+@media (max-width: 420px) {
+  .gallery { grid-template-columns: repeat(2, 1fr); }
+}
 
 .album-item {
   display: flex;
@@ -95,9 +135,9 @@ body.show-meta .card .meta { display: block; }
 .modal-box form { display: flex; flex-direction: column; }
 #loginError { color: #f44336; margin-top: 8px; font-size: 14px; }
 
-.admin-dashboard { background: #1a1a1a; padding: 24px; min-height: calc(100vh - 200px); }
+.admin-dashboard { position: relative; background: #1a1a1a; padding: 24px; min-height: calc(100vh - 200px); }
 .admin-dashboard h2 { margin-top: 0; margin-bottom: 24px; }
-.close-dashboard-btn { position: absolute; top: 24px; right: 24px; background: #666; padding: 8px 16px; border-radius: 4px; cursor: pointer; border: none; color: white; }
+.close-dashboard-btn { position: absolute; top: 24px; right: 24px; background: #666; padding: 8px 16px; border-radius: 4px; cursor: pointer; border: none; color: white; z-index: 1003; }
 .close-dashboard-btn:hover { background: #555; }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
 .stat-card { background: #222; padding: 24px; border-radius: 8px; border: 1px solid #333; text-align: center; }
@@ -114,3 +154,8 @@ body.show-meta .card .meta { display: block; }
 .dashboard-table tr:hover { background: #2a2a2a; }
 .delete-user-btn { padding: 6px 10px; font-size: 12px; background: #e53935; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .delete-user-btn:hover { background: #c62828; }
+
+@media (max-width: 768px) {
+  .admin-dashboard { padding: 18px 16px 32px; }
+  .close-dashboard-btn { top: 12px; right: 12px; padding: 8px 12px; }
+}

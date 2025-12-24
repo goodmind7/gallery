@@ -8,6 +8,40 @@ let sortKey = 'created_at';
 let sortOrder = 'desc';
 let showUpload = false; // Controls visibility of upload section when authenticated (default hidden)
 
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+const headerActions = document.querySelector('.header-actions');
+
+function openMobileMenu() {
+  document.body.classList.add('mobile-menu-open');
+}
+
+function closeMobileMenu() {
+  document.body.classList.remove('mobile-menu-open');
+}
+
+function toggleMobileMenu() {
+  document.body.classList.toggle('mobile-menu-open');
+}
+
+if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+if (mobileMenuOverlay) mobileMenuOverlay.addEventListener('click', closeMobileMenu);
+if (headerActions) {
+  headerActions.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768 && e.target.closest('button')) {
+      closeMobileMenu();
+    }
+  });
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeMobileMenu();
+});
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 768) closeMobileMenu();
+});
+
 async function checkAuth() {
   try {
     const res = await fetch('/api/me', { credentials: 'include' });
@@ -52,7 +86,7 @@ function updateAuthUI() {
 function updateMetaToggleUI() {
   document.body.classList.toggle('show-meta', showMeta);
   const btn = document.getElementById('toggleMetaBtn');
-  if (btn) btn.innerHTML = showMeta ? '<i class="fa-solid fa-circle-xmark"></i> ' : '<i class="fa-solid fa-circle-info"></i> ';
+  if (btn) btn.innerHTML = showMeta ? '<i class="fa-solid fa-circle-xmark"></i> <span class="btn-label"> Info</span>' : '<i class="fa-solid fa-circle-info"></i> <span class="btn-label"> Info</span>';
 }
 
 function toggleMeta() {
@@ -64,7 +98,7 @@ function updateUploadToggleUI() {
   const btn = document.getElementById('toggleUploadBtn');
   if (btn) {
     btn.title = showUpload ? 'Hide Upload' : 'Show Upload';
-    btn.innerHTML = showUpload ? '<i class="fa-regular fa-square-plus"></i>' : '<i class="fa-regular fa-square-plus"></i>';
+    btn.innerHTML = showUpload ? '<i class="fa-regular fa-square-plus"></i> <span class="btn-label"> Upload</span>' : '<i class="fa-regular fa-square-plus"></i> <span class="btn-label"> Upload</span>';
   }
   // Also reflect current auth state
   if (isAuthenticated) {

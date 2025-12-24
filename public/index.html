@@ -9,22 +9,37 @@
 </head>
 <body>
   <header>
-    <h3>Han's Family2</h3>
+    <h3>Gallery</h3>
+    <button id="mobileMenuBtn" class="header-btn mobile-menu-toggle" aria-label="Menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
     <div class="header-actions">
       <span id="userDisplay" class="header-user" style="display:none;"></span>
       <!-- 상세정보 -->
-      <button id="toggleMetaBtn" class="header-btn" title="Show/Hide Info"><i class="fa-solid fa-circle-info"></i></button>
+      <button id="toggleMetaBtn" class="header-btn" title="Show/Hide Info">
+        <i class="fa-solid fa-circle-info"></i><span class="btn-label"> Info</span>
+      </button>
       <!-- 이미지 업로드 토글 -->
-      <button id="toggleUploadBtn" class="header-btn" title="Hide Upload"><i class="fa-regular fa-square-plus"></i></button>
+      <button id="toggleUploadBtn" class="header-btn" title="Hide Upload">
+        <i class="fa-regular fa-square-plus"></i><span class="btn-label"> Upload</span>
+      </button>
       <!-- 앨범 추가 -->
-      <button id="createAlbumBtn" class="header-btn create-album-btn" style="display:none;" title="New Album"><i class="fa-solid fa-folder-plus"></i></button>
+      <button id="createAlbumBtn" class="header-btn create-album-btn" style="display:none;" title="New Album">
+        <i class="fa-solid fa-folder-plus"></i><span class="btn-label"> New Album</span>
+      </button>
       <!-- 관리자 대시보드 -->
-      <button id="adminDashboardBtn" class="header-btn" style="display:none;" title="Dashboard"><i class="fa-solid fa-gauge-high"></i></button>
+      <button id="adminDashboardBtn" class="header-btn" style="display:none;" title="Dashboard">
+        <i class="fa-solid fa-gauge-high"></i><span class="btn-label"> Dashboard</span>
+      </button>
       <!-- 로그인/로그아웃 -->
-      <button id="loginBtn" class="header-btn" title="Login"><i class="fa-solid fa-right-to-bracket"></i></button>
-      <button id="logoutBtn" class="header-btn" style="display:none;" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+      <button id="loginBtn" class="header-btn" title="Login">
+        <i class="fa-solid fa-right-to-bracket"></i><span class="btn-label"> Login</span>
+      </button>
+      <button id="logoutBtn" class="header-btn" style="display:none;" title="Logout">
+        <i class="fa-solid fa-right-from-bracket"></i><span class="btn-label"> Logout</span>
+      </button>
     </div>
   </header>
+
+  <div id="mobileMenuOverlay" class="mobile-menu-overlay"></div>
 
   <section id="adminDashboard" class="admin-dashboard" style="display:none;">
     <h2>Admin Dashboard</h2>
@@ -67,6 +82,11 @@
 
   <section class="albums-bar">
     <div class="albums-scroll" id="albumsList"></div>
+  
+  </section>
+
+  <section class="sort-section">
+    <div class="sort-bar">
       <div class="sort-controls">
         <label for="sortSelect"><i class="fa-solid fa-sort"></i></label>
         <select id="sortSelect">
@@ -80,7 +100,7 @@
           <option value="likes_asc">Least Liked</option>
         </select>
       </div>
-    
+    </div>
   </section>
 
   <section class="upload" style="display:none;">
@@ -96,7 +116,8 @@
     <div id="uploadStatus"></div>
   </section>
 
-  <section class="gallery" id="gallery"></section>
+  <section class="gallery" id="gallery">
+  </section>
 
   <div id="modal" class="modal">
     <span class="modal-close">&times;</span>
