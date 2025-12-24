@@ -6,7 +6,8 @@ let currentImageIndex = -1; // Current image in modal
 let showMeta = false; // Controls visibility of meta section
 let sortKey = 'created_at';
 let sortOrder = 'desc';
-let showUpload = false; // Controls visibility of upload section when authenticated (default hidden)
+let commentAuthorAutoFilled = false;
+let gallerySize = 'medium';
 
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
@@ -50,37 +51,58 @@ async function checkAuth() {
     currentUser = isAuthenticated ? (data.user || null) : null;
     updateAuthUI();
     updateMetaToggleUI();
-    updateUploadToggleUI();
+    prefillCommentAuthor();
     await fetchAlbums();
   } catch (e) {
     isAuthenticated = false;
     currentUser = null;
     updateAuthUI();
     updateMetaToggleUI();
-    updateUploadToggleUI();
+    prefillCommentAuthor();
   }
+}
+
+function applyGallerySize(size) {
+  gallerySize = size;
+  const galleryEl = document.getElementById('gallery');
+  if (galleryEl) {
+    galleryEl.classList.remove('size-small', 'size-medium', 'size-large');
+    galleryEl.classList.add(`size-${size}`);
+  }
+  document.querySelectorAll('.size-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.size === size);
+  });
+  localStorage.setItem('gallery_size', size);
 }
 
 function updateAuthUI() {
   document.getElementById('loginBtn').style.display = isAuthenticated ? 'none' : 'block';
   document.getElementById('logoutBtn').style.display = isAuthenticated ? 'block' : 'none';
-  document.querySelector('.upload').style.display = (isAuthenticated && showUpload) ? 'flex' : 'none';
   document.getElementById('createAlbumBtn').style.display = isAuthenticated ? 'block' : 'none';
   const toggleUploadBtn = document.getElementById('toggleUploadBtn');
   if (toggleUploadBtn) toggleUploadBtn.style.display = isAuthenticated ? 'block' : 'none';
   
   const isAdmin = currentUser?.admin === true;
-  document.getElementById('adminDashboardBtn').style.display = isAdmin ? 'block' : 'none';
   
   const userEl = document.getElementById('userDisplay');
   if (isAuthenticated) {
-    const label = currentUser?.admin ? 'admin' : (currentUser?.email || '');
+    let label = currentUser?.admin ? 'admin' : (currentUser?.email || '');
+    if (!currentUser?.admin && label) {
+      label = label.split('@')[0];
+    }
     userEl.textContent = label;
     userEl.style.display = label ? 'inline' : 'none';
+    userEl.onclick = () => {
+      closeMobileMenu();
+      currentUser?.admin ? openDashboard() : openUserDashboard();
+    };
+    userEl.style.cursor = 'pointer';
   } else {
     userEl.textContent = '';
     userEl.style.display = 'none';
+    userEl.onclick = null;
   }
+  prefillCommentAuthor();
 }
 
 function updateMetaToggleUI() {
@@ -92,23 +114,20 @@ function updateMetaToggleUI() {
 function toggleMeta() {
   showMeta = !showMeta;
   updateMetaToggleUI();
+  closeMobileMenu();
 }
 
-function updateUploadToggleUI() {
-  const btn = document.getElementById('toggleUploadBtn');
-  if (btn) {
-    btn.title = showUpload ? 'Hide Upload' : 'Show Upload';
-    btn.innerHTML = showUpload ? '<i class="fa-regular fa-square-plus"></i> <span class="btn-label"> Upload</span>' : '<i class="fa-regular fa-square-plus"></i> <span class="btn-label"> Upload</span>';
+function openUploadModal() {
+  if (!isAuthenticated) {
+    openLoginModal();
+    return;
   }
-  // Also reflect current auth state
-  if (isAuthenticated) {
-    document.querySelector('.upload').style.display = showUpload ? 'flex' : 'none';
-  }
+  document.getElementById('uploadModal').classList.add('show');
 }
 
-function toggleUpload() {
-  showUpload = !showUpload;
-  updateUploadToggleUI();
+function closeUploadModal() {
+  document.getElementById('uploadModal').classList.remove('show');
+  document.getElementById('uploadStatus').textContent = '';
 }
 
 async function fetchAlbums() {
@@ -119,7 +138,7 @@ async function fetchAlbums() {
     const list = document.getElementById('albumsList');
     
     select.innerHTML = '<option value="">No Album</option>';
-    list.innerHTML = '<button class="album-btn active" onclick="selectAlbum(null)">All Images</button>';
+    list.innerHTML = '<button class="album-btn active" onclick="selectAlbum(null)">All</button>';
     
     for (const album of albums) {
       const opt = document.createElement('option');
@@ -144,7 +163,7 @@ function selectAlbum(albumId) {
   selectedAlbumId = albumId;
   document.querySelectorAll('.album-btn').forEach(btn => {
     btn.classList.remove('active');
-    if ((albumId === null && btn.textContent === 'All Images') || 
+    if ((albumId === null && btn.textContent === 'All') || 
         (albumId !== null && parseInt(btn.dataset.albumId) === albumId)) {
       btn.classList.add('active');
     }
@@ -216,7 +235,7 @@ async function fetchImages() {
       if (it.date_taken) {
         const dateTaken = document.createElement('div');
         dateTaken.className = 'date-taken';
-        dateTaken.textContent = '📅 ' + new Date(it.date_taken).toLocaleDateString();
+        dateTaken.innerHTML = '<i class="fa-regular fa-calendar"></i> ' + new Date(it.date_taken).toLocaleDateString();
         meta.appendChild(dateTaken);
       }
       
@@ -226,10 +245,16 @@ async function fetchImages() {
       // Like button
       const likeBtn = document.createElement('button');
       likeBtn.className = 'like-btn';
-      likeBtn.innerHTML = `<i class="fa-regular fa-thumbs-up"></i> <span class="like-count">${it.like_count || 0}</span>`;
+      likeBtn.innerHTML = `<i class="fa-regular fa-heart"></i> <span class="like-count">${it.like_count || 0}</span>`;
       likeBtn.style.opacity = it.user_liked ? '1' : '0.5';
       likeBtn.onclick = (e) => { e.stopPropagation(); toggleLike(it.id, likeBtn); };
       metaBar.appendChild(likeBtn);
+
+      // Comment count display
+      const commentCount = document.createElement('div');
+      commentCount.className = 'comment-count';
+      commentCount.innerHTML = `<i class="fa-solid fa-comments"></i> <span>${it.comment_count || 0}</span>`;
+      metaBar.appendChild(commentCount);
       
       meta.appendChild(metaBar);
       
@@ -275,10 +300,17 @@ function openModal(indexOrSrc, caption) {
     const image = allImages[currentImageIndex];
     modalImg.src = `/uploads/${image.filename}`;
     modalCaption.textContent = image.title || image.filename;
+    modalImg.dataset.imageId = image.id;
+    prefillCommentAuthor();
+    setCommentButtonState(!!image.comment_count);
+    loadComments(image.id);
   } else {
     modalImg.src = indexOrSrc;
     modalCaption.textContent = caption;
     currentImageIndex = -1; // No index tracking for direct src
+    delete modalImg.dataset.imageId;
+    document.getElementById('commentsList').innerHTML = '';
+    setCommentButtonState(false);
   }
   
   modal.classList.add('show');
@@ -304,15 +336,144 @@ function nextImage() {
 
 function closeModal() {
   document.getElementById('modal').classList.remove('show');
+  document.getElementById('commentsOverlay').classList.remove('show');
+}
+
+// ============ COMMENTS ============
+function toggleCommentsPanel() {
+  const overlay = document.getElementById('commentsOverlay');
+  overlay.classList.toggle('show');
+}
+
+function prefillCommentAuthor() {
+  const input = document.getElementById('commentAuthor');
+  if (!input) return;
+  const localId = currentUser?.email ? currentUser.email.split('@')[0] : '';
+  if (localId) {
+    // Only override if empty or previously auto-filled
+    if (!input.value || commentAuthorAutoFilled) {
+      input.value = localId;
+      commentAuthorAutoFilled = true;
+    }
+  } else if (commentAuthorAutoFilled) {
+    input.value = '';
+    commentAuthorAutoFilled = false;
+  }
+}
+
+function setCommentButtonState(hasComments) {
+  const btn = document.getElementById('toggleCommentsBtn');
+  if (!btn) return;
+  btn.classList.toggle('has-comments', !!hasComments);
+}
+
+async function loadComments(imageId) {
+  try {
+    const res = await fetch(`/api/images/${imageId}/comments`);
+    const comments = await res.json();
+    const list = document.getElementById('commentsList');
+    
+    if (!comments || comments.length === 0) {
+      list.innerHTML = '<p style="color: #999; font-size: 12px;">No comments yet</p>';
+      setCommentButtonState(false);
+      return;
+    }
+    setCommentButtonState(comments.length > 0);
+    
+    list.innerHTML = comments.map(c => {
+      const emailLocal = c.email ? c.email.split('@')[0] : '';
+      const author = emailLocal || c.author_name || 'Anonymous';
+      const date = new Date(c.created_at).toLocaleDateString();
+      const canDelete = isAuthenticated && (currentUser?.admin || currentUser?.id === c.user_id);
+      return `
+        <div class="comment-item">
+          ${canDelete ? `
+            <button class="comment-menu" onclick="toggleCommentDelete(this)" title="More">...</button>
+            <button class="comment-delete" onclick="deleteComment(${c.id})" title="Delete">✕</button>
+          ` : ''}
+          <div class="comment-author">${author}</div>
+          <div class="comment-time">${date}</div>
+          <div class="comment-text">${escapeHtml(c.text)}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.error('Error loading comments:', e);
+    setCommentButtonState(false);
+  }
+}
+
+async function postComment(e) {
+  e.preventDefault();
+  const imageId = document.getElementById('modalImg').dataset.imageId;
+  if (!imageId) return;
+  
+  const text = document.getElementById('commentText').value.trim();
+  const author_name = document.getElementById('commentAuthor').value.trim();
+  
+  if (!text) return;
+  
+  try {
+    const res = await fetch(`/api/images/${imageId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ text, author_name: !isAuthenticated ? author_name : undefined })
+    });
+    
+    if (res.ok) {
+      document.getElementById('commentForm').reset();
+      prefillCommentAuthor();
+      await loadComments(imageId);
+    } else {
+      alert('Failed to post comment');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deleteComment(commentId) {
+  if (!confirm('Delete this comment?')) return;
+  
+  try {
+    const imageId = document.getElementById('modalImg').dataset.imageId;
+    const res = await fetch(`/api/comments/${commentId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    
+    if (res.ok) {
+      await loadComments(imageId);
+    } else {
+      alert('Failed to delete comment');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function toggleCommentDelete(btn) {
+  const item = btn.closest('.comment-item');
+  if (item) {
+    item.classList.toggle('show-delete');
+  }
+}
+
+function escapeHtml(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+  return text.replace(/[&<>"']/g, m => map[m]);
 }
 
 document.querySelector('.modal-close').onclick = closeModal;
 document.getElementById('modal').onclick = (e) => {
   if (e.target.id === 'modal') closeModal();
 };
+document.getElementById('toggleCommentsBtn')?.addEventListener('click', toggleCommentsPanel);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
 });
+document.getElementById('commentForm').addEventListener('submit', postComment);
 
 async function uploadImage(e) {
   e.preventDefault();
@@ -326,6 +487,7 @@ async function uploadImage(e) {
     status.textContent = 'Uploaded!';
     form.reset();
     await fetchImages();
+    setTimeout(() => closeUploadModal(), 1000);
   } catch (err) {
     status.textContent = 'Error: ' + err.message;
   }
@@ -392,18 +554,73 @@ function closeCreateAlbumModal() {
   document.getElementById('createAlbumModal').classList.remove('show');
   document.getElementById('albumError').textContent = '';
   document.getElementById('albumName').value = '';
+  const publicBox = document.getElementById('albumPublic');
+  if (publicBox) publicBox.checked = true;
+}
+
+function openUserDashboard() {
+  if (!isAuthenticated) return;
+  
+  document.getElementById('userDashboardModal').classList.add('show');
+  loadUserStats();
+}
+
+function closeUserDashboard() {
+  document.getElementById('userDashboardModal').classList.remove('show');
+}
+
+async function loadUserStats() {
+  try {
+    const res = await fetch('/api/user/stats', { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('userEmail').textContent = data.email || '-';
+      document.getElementById('userImageCount').textContent = data.imageCount || 0;
+      document.getElementById('userLikesCount').textContent = data.likesCount || 0;
+      document.getElementById('userCommentsCount').textContent = data.commentsCount || 0;
+    }
+  } catch (e) {
+    console.error('Error loading user stats:', e);
+  }
+}
+
+async function deleteMyAccount() {
+  if (!confirm('Are you sure you want to delete your account? This action cannot be undone and will delete all your images, comments, and likes.')) return;
+  if (!confirm('This is your final warning. Delete account permanently?')) return;
+  
+  try {
+    const res = await fetch('/api/user/me', {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    
+    if (res.ok) {
+      alert('Account deleted successfully');
+      closeUserDashboard();
+      isAuthenticated = false;
+      currentUser = null;
+      updateAuthUI();
+      await fetchImages();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert('Delete failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 async function createAlbum(e) {
   e.preventDefault();
   const name = document.getElementById('albumName').value.trim();
+  const isPublic = document.getElementById('albumPublic')?.checked ?? true;
   if (!name) return;
   try {
     const res = await fetch('/api/albums', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name, is_public: isPublic })
     });
     if (res.ok) {
       closeCreateAlbumModal();
@@ -458,10 +675,15 @@ async function signup(e) {
       body: JSON.stringify({ email, password })
     });
     if (res.ok) {
-      await checkAuth();
+      const data = await res.json().catch(() => ({}));
       closeSignupModal();
       closeLoginModal();
-      await fetchImages();
+      if (data.pendingApproval) {
+        alert('Account created successfully!\n\nYour account is pending admin approval. You will be able to log in once approved.');
+      } else {
+        await checkAuth();
+        await fetchImages();
+      }
     } else {
       const data = await res.json().catch(() => ({}));
       err.textContent = data.error || 'Signup failed';
@@ -531,9 +753,8 @@ document.getElementById('signupForm')?.addEventListener('submit', signup);
 document.getElementById('createAlbumBtn').onclick = openCreateAlbumModal;
 document.getElementById('createAlbumForm').addEventListener('submit', createAlbum);
 document.getElementById('uploadForm').addEventListener('submit', uploadImage);
-document.getElementById('adminDashboardBtn').onclick = openDashboard;
 document.getElementById('toggleMetaBtn').onclick = toggleMeta;
-document.getElementById('toggleUploadBtn')?.addEventListener('click', toggleUpload);
+document.getElementById('toggleUploadBtn')?.addEventListener('click', openUploadModal);
 const sortSelectEl = document.getElementById('sortSelect');
 if (sortSelectEl) {
   const setSortFromValue = (v) => {
@@ -557,6 +778,24 @@ if (sortSelectEl) {
     fetchImages();
   });
 }
+
+// Gallery size buttons
+const savedSize = localStorage.getItem('gallery_size');
+const validSizes = new Set(['small', 'medium', 'large']);
+if (savedSize && validSizes.has(savedSize)) {
+  applyGallerySize(savedSize);
+} else {
+  applyGallerySize('medium');
+}
+
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const size = btn.dataset.size;
+    if (validSizes.has(size)) {
+      applyGallerySize(size);
+    }
+  });
+});
 
 async function openDashboard() {
   try {
@@ -606,6 +845,37 @@ async function openDashboard() {
       </table>
     `;
     
+    // Pending users
+    const pendingRes = await fetch('/api/admin/pending-users', { credentials: 'include' });
+    if (pendingRes.ok) {
+      const pendingData = await pendingRes.json();
+      const pendingList = document.getElementById('pendingUsersList');
+      if (pendingData.users.length === 0) {
+        pendingList.innerHTML = '<p class="no-pending">No pending approvals</p>';
+      } else {
+        pendingList.innerHTML = `
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>ID</th><th>Email</th><th>Requested</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              ${pendingData.users.map(u => `
+                <tr>
+                  <td>${u.id}</td>
+                  <td>${u.email}</td>
+                  <td>${new Date(u.created_at).toLocaleString()}</td>
+                  <td>
+                    <button class="approve-user-btn" onclick="approveUser(${u.id})">Approve</button>
+                    <button class="reject-user-btn" onclick="rejectUser(${u.id})">Reject</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    }
+    
     // Albums management
     const albumsRes = await fetch('/api/albums');
     const albums = await albumsRes.json();
@@ -631,10 +901,41 @@ async function openDashboard() {
       </table>
     `;
     
+    // Comments management
+    const commentsRes = await fetch('/api/comments/all', { credentials: 'include' });
+    if (commentsRes.ok) {
+      const commentsData = await commentsRes.json();
+      const commentsManagement = document.getElementById('commentsManagement');
+      if (commentsData.comments && commentsData.comments.length > 0) {
+        commentsManagement.innerHTML = `
+          <table class="dashboard-table">
+            <thead>
+              <tr><th>ID</th><th>Author</th><th>Comment</th><th>Image</th><th>Created</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              ${commentsData.comments.map(c => `
+                <tr>
+                  <td>${c.id}</td>
+                  <td>${c.author_name || 'Unknown'}</td>
+                  <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${c.text}</td>
+                  <td>${c.image_title || `Image #${c.image_id}`}</td>
+                  <td>${new Date(c.created_at).toLocaleString()}</td>
+                  <td>
+                    <button class="delete-comment-btn" onclick="deleteCommentAdmin(${c.id})">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } else {
+        commentsManagement.innerHTML = '<p class="no-pending">No comments yet</p>';
+      }
+    }
+    
     // Show dashboard, hide gallery
     document.getElementById('adminDashboard').style.display = 'block';
     document.querySelector('.albums-bar').style.display = 'none';
-    document.querySelector('.upload').style.display = 'none';
     document.querySelector('.gallery').style.display = 'none';
   } catch (e) {
     alert('Error loading dashboard: ' + e.message);
@@ -644,7 +945,6 @@ async function openDashboard() {
 function closeDashboard() {
   document.getElementById('adminDashboard').style.display = 'none';
   document.querySelector('.albums-bar').style.display = 'flex';
-  document.querySelector('.upload').style.display = (isAuthenticated && showUpload) ? 'flex' : 'none';
   document.querySelector('.gallery').style.display = 'grid';
 }
 
@@ -657,6 +957,63 @@ async function deleteUser(userId) {
       await openDashboard();
     } else {
       const err = await res.json().catch(() => ({}));
+      alert('Delete failed: ' + (err.error || res.statusText));
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function approveUser(userId) {
+  try {
+    const res = await fetch('/api/admin/approve-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ userId })
+    });
+    if (res.ok) {
+      await openDashboard();
+    } else {
+      const err = await res.json();
+      alert('Approval failed: ' + (err.error || res.statusText));
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function rejectUser(userId) {
+  if (!confirm('Permanently delete this user account?')) return;
+  try {
+    const res = await fetch('/api/admin/reject-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ userId })
+    });
+    if (res.ok) {
+      await openDashboard();
+    } else {
+      const err = await res.json();
+      alert('Rejection failed: ' + (err.error || res.statusText));
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deleteCommentAdmin(commentId) {
+  if (!confirm('Delete this comment? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`/api/comments/${commentId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    if (res.ok) {
+      await openDashboard();
+    } else {
+      const err = await res.json();
       alert('Delete failed: ' + (err.error || res.statusText));
     }
   } catch (e) {
@@ -710,4 +1067,3 @@ async function deleteAlbum(albumId) {
 checkAuth();
 fetchImages();
 updateMetaToggleUI();
-updateUploadToggleUI();

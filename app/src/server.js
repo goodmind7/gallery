@@ -66,11 +66,12 @@ app.post('/api/login', async (req, res) => {
 
     // DB user login by email
     const pool = getPool();
-    const [rows] = await pool.query('SELECT id, email, password_hash FROM users WHERE email = ?', [identifier]);
+    const [rows] = await pool.query('SELECT id, email, password_hash, approved FROM users WHERE email = ?', [identifier]);
     if (!rows || rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
     const user = rows[0];
     const ok = await bcrypt.compare(password || '', user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user.approved) return res.status(403).json({ error: 'Account pending admin approval' });
     req.session.authenticated = true;
     req.session.userId = user.id;
     req.session.isAdmin = false;
@@ -137,7 +138,7 @@ app.get('/api/admin/stats', async (req, res) => {
 app.get('/api/albums', async (req, res) => {
   try {
     const pool = getPool();
-    const [rows] = await pool.query('SELECT id, name, created_at FROM albums ORDER BY created_at DESC');
+    const [rows] = await pool.query('SELECT id, name, is_public, created_at FROM albums ORDER BY created_at DESC');
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: 'DB error', details: e.message });
@@ -146,11 +147,12 @@ app.get('/api/albums', async (req, res) => {
 
 app.post('/api/albums', requireAuth, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, is_public } = req.body;
     if (!name || name.trim().length === 0) return res.status(400).json({ error: 'Album name required' });
+    const isPublic = is_public === undefined ? 1 : (is_public ? 1 : 0);
     const pool = getPool();
-    const [result] = await pool.query('INSERT INTO albums (name) VALUES (?)', [name]);
-    res.status(201).json({ id: result.insertId, name });
+    const [result] = await pool.query('INSERT INTO albums (name, is_public) VALUES (?, ?)', [name, isPublic]);
+    res.status(201).json({ id: result.insertId, name, is_public: !!isPublic });
   } catch (e) {
     res.status(500).json({ error: 'Create failed', details: e.message });
   }
@@ -159,7 +161,7 @@ app.post('/api/albums', requireAuth, async (req, res) => {
 // Update album
 app.put('/api/albums/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { name } = req.body;
+  const { name, is_public } = req.body;
   
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Album name is required' });
@@ -174,8 +176,14 @@ app.put('/api/albums/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Album not found' });
     }
     
-    // Update the album
-    await pool.query('UPDATE albums SET name = ? WHERE id = ?', [name.trim(), id]);
+    const updates = ['name = ?'];
+    const params = [name.trim()];
+    if (is_public !== undefined) {
+      updates.push('is_public = ?');
+      params.push(is_public ? 1 : 0);
+    }
+    params.push(id);
+    await pool.query(`UPDATE albums SET ${updates.join(', ')} WHERE id = ?`, params);
     res.json({ message: 'Album updated successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update album' });
@@ -207,6 +215,46 @@ app.delete('/api/albums/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Admin: Get pending users (not approved)
+app.get('/api/admin/pending-users', requireAuth, async (req, res) => {
+  if (!req.session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const pool = getPool();
+    const [users] = await pool.query('SELECT id, email, created_at FROM users WHERE approved = 0 ORDER BY created_at DESC');
+    res.json({ users });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch pending users' });
+  }
+});
+
+// Admin: Approve user
+app.post('/api/admin/approve-user', requireAuth, async (req, res) => {
+  if (!req.session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  try {
+    const pool = getPool();
+    await pool.query('UPDATE users SET approved = 1 WHERE id = ?', [userId]);
+    res.json({ success: true, message: 'User approved' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to approve user' });
+  }
+});
+
+// Admin: Reject user (delete account)
+app.post('/api/admin/reject-user', requireAuth, async (req, res) => {
+  if (!req.session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  try {
+    const pool = getPool();
+    await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+    res.json({ success: true, message: 'User rejected and deleted' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to reject user' });
+  }
+});
+
 app.post('/api/signup', async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -221,12 +269,9 @@ app.post('/api/signup', async (req, res) => {
     const [exists] = await pool.query('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
     if (exists.length > 0) return res.status(409).json({ error: 'Email already in use' });
     const hash = await bcrypt.hash(password, 10);
-    const [result] = await pool.query('INSERT INTO users (email, password_hash) VALUES (?, ?)', [normalizedEmail, hash]);
-    // auto-login after signup
-    req.session.authenticated = true;
-    req.session.userId = result.insertId;
-    req.session.isAdmin = false;
-    res.status(201).json({ success: true, user: { id: result.insertId, email: normalizedEmail } });
+    const [result] = await pool.query('INSERT INTO users (email, password_hash, approved) VALUES (?, ?, 0)', [normalizedEmail, hash]);
+    // Don't auto-login; user needs admin approval
+    res.status(201).json({ success: true, message: 'Account created. Awaiting admin approval before you can log in.', pendingApproval: true });
   } catch (e) {
     res.status(500).json({ error: 'Signup failed', details: e.message });
   }
@@ -243,7 +288,7 @@ app.get('/api/images', async (req, res) => {
     const allowedSorts = new Set(['created_at', 'date_taken', 'title', 'like_count']);
     if (!allowedSorts.has(sort)) sort = 'created_at';
 
-    let query = 'SELECT i.id, i.album_id, i.user_id, i.filename, i.title, i.date_taken, i.created_at, COUNT(l.id) as like_count';
+    let query = 'SELECT i.id, i.album_id, i.user_id, i.filename, i.title, i.date_taken, i.created_at, COUNT(l.id) as like_count, (SELECT COUNT(*) FROM comments c WHERE c.image_id = i.id) AS comment_count';
     let params = [];
     if (userId) {
       query += ', MAX(CASE WHEN l.user_id = ? THEN 1 ELSE 0 END) as user_liked';
@@ -275,6 +320,102 @@ app.get('/api/images', async (req, res) => {
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: 'DB error', details: e.message });
+  }
+});
+
+// ============ COMMENTS (MUST BE BEFORE GENERIC :id ROUTES) ============
+// Get comments for an image
+app.get('/api/images/:id/comments', async (req, res) => {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(`
+      SELECT 
+        c.id, 
+        c.text, 
+        c.author_name, 
+        c.user_id, 
+        c.created_at,
+        u.email
+      FROM comments c
+      LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.image_id = ?
+      ORDER BY c.created_at ASC
+    `, [req.params.id]);
+    res.json(rows || []);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch comments', details: e.message });
+  }
+});
+
+// Create a comment
+app.post('/api/images/:id/comments', async (req, res) => {
+  try {
+    const pool = getPool();
+    const { text, author_name } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Comment text is required' });
+    }
+    
+    const userId = req.session?.userId || null;
+    const nameToUse = userId ? null : (author_name || 'Anonymous');
+    
+    const [result] = await pool.query(
+      'INSERT INTO comments (image_id, user_id, author_name, text) VALUES (?, ?, ?, ?)',
+      [req.params.id, userId, nameToUse, text.trim()]
+    );
+    
+    res.json({ id: result.insertId, text: text.trim(), author_name: nameToUse, user_id: userId, created_at: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to create comment', details: e.message });
+  }
+});
+
+// Delete a comment
+app.delete('/api/comments/:id', requireAuth, async (req, res) => {
+  try {
+    const pool = getPool();
+    const [comment] = await pool.query('SELECT user_id, image_id FROM comments WHERE id = ?', [req.params.id]);
+    if (!comment || comment.length === 0) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+    
+    const isAdmin = req.session?.isAdmin === true;
+    const isOwner = comment[0].user_id === req.session?.userId;
+    
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    await pool.query('DELETE FROM comments WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete comment', details: e.message });
+  }
+});
+
+// Admin: Get all comments
+app.get('/api/comments/all', requireAuth, async (req, res) => {
+  if (!req.session.isAdmin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const pool = getPool();
+    const [comments] = await pool.query(`
+      SELECT 
+        c.id, 
+        c.text, 
+        c.author_name, 
+        c.user_id, 
+        c.image_id,
+        c.created_at,
+        i.title as image_title,
+        u.email
+      FROM comments c
+      LEFT JOIN users u ON c.user_id = u.id
+      LEFT JOIN images i ON c.image_id = i.id
+      ORDER BY c.created_at DESC
+    `);
+    res.json({ comments: comments || [] });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch comments', details: e.message });
   }
 });
 
@@ -468,6 +609,62 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   }
 });
 
+// User stats endpoint
+app.get('/api/user/stats', requireAuth, async (req, res) => {
+  try {
+    const pool = getPool();
+    const userId = req.session.userId;
+    
+    const [imageCount] = await pool.query('SELECT COUNT(*) as count FROM images WHERE user_id = ?', [userId]);
+    const [likesCount] = await pool.query('SELECT COUNT(*) as count FROM likes l JOIN images i ON l.image_id = i.id WHERE i.user_id = ?', [userId]);
+    const [commentsCount] = await pool.query('SELECT COUNT(*) as count FROM comments WHERE user_id = ?', [userId]);
+    const [userInfo] = await pool.query('SELECT email FROM users WHERE id = ?', [userId]);
+    
+    res.json({
+      email: userInfo[0]?.email || '',
+      imageCount: imageCount[0]?.count || 0,
+      likesCount: likesCount[0]?.count || 0,
+      commentsCount: commentsCount[0]?.count || 0
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch stats', details: e.message });
+  }
+});
+
+// Delete own account endpoint
+app.delete('/api/user/me', requireAuth, async (req, res) => {
+  try {
+    const pool = getPool();
+    const userId = req.session.userId;
+    
+    // Prevent deleting if admin
+    if (req.session.admin === true) {
+      return res.status(400).json({ error: 'Admin accounts cannot be deleted this way' });
+    }
+    
+    // Check user count
+    const [countRows] = await pool.query('SELECT COUNT(*) AS cnt FROM users');
+    const userCount = countRows?.[0]?.cnt ?? 0;
+    if (userCount <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the last remaining user' });
+    }
+    
+    // Delete user's comments
+    await pool.query('DELETE FROM comments WHERE user_id = ?', [userId]);
+    // Delete user's likes
+    await pool.query('DELETE FROM likes WHERE user_id = ?', [userId]);
+    // Delete user's images (this will cascade to likes on those images)
+    await pool.query('DELETE FROM images WHERE user_id = ?', [userId]);
+    // Delete user
+    await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+    
+    // Destroy session
+    req.session.destroy();
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Delete account failed', details: e.message });
+  }
+});
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {

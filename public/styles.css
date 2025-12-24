@@ -1,5 +1,6 @@
 * { box-sizing: border-box; }
-body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #111; color: #eee; }
+html { height: 100%; }
+body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #111; color: #eee; min-height: 100%; display: flex; flex-direction: column; }
 header { padding: 16px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
 .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .mobile-menu-toggle { display: none !important; }
@@ -12,25 +13,31 @@ header { padding: 16px; border-bottom: 1px solid #333; display: flex; justify-co
 .btn-label { display: none; }
 .albums-bar { padding: 12px 16px; border-bottom: 1px solid #333; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .albums-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+#albumSelect { margin-bottom: 10px; padding: 10px;}
 .sort-section { padding: 10px 12px; } 
 .sort-bar { display: flex; justify-content: flex-end; }
 .sort-controls { display: inline-flex; align-items: center; gap: 8px; color: #ccc; font-size: 14px; }
 .sort-controls select { padding: 8px; background: #333; color: #eee; border: 1px solid #555; border-radius: 4px; }
+.size-controls { display: inline-flex; align-items: center; gap: 6px; margin: 0 12px; }
+.size-btn { padding: 6px 9px; background: #333; color: #eee; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.size-btn:hover { background: #444; }
+.size-btn.active { background: #1e90ff; border-color: #1e90ff; color: #fff; }
 .album-btn { padding: 8px 16px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .album-btn:hover { background: #444; }
 .album-btn.active { background: #1e90ff; border-color: #1e90ff; }
-.create-album-btn { background: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.create-album-btn:hover { background: #1b5e20; }
-.upload { padding: 16px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #333; }
-.upload form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.upload select { padding: 8px; background: #333; color: #eee; border: 1px solid #555; border-radius: 4px; }
+.create-album-btn { background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.create-album-btn:hover { background: #444; }
 button { padding: 8px 12px; background: #1e90ff; color: white; border: none; border-radius: 4px; cursor: pointer; }
 button:hover { background: #1c7ed6; }
 .cancel-btn { background: #666; margin: 10px 0;}
 .cancel-btn:hover { background: #555; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; color: #ccc; font-size: 14px; margin: 8px 0; }
+.checkbox-row input { width: auto; }
 #uploadStatus { margin-left: 8px; font-size: 14px; color: #aaa; }
-.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; padding: 16px; }
-.card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; overflow: hidden; position: relative; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; padding: 16px; flex: 1; align-content: start; }
+.gallery.size-small { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.gallery.size-large { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; overflow: hidden; position: relative; height: fit-content; }
 .card img { display: block; width: 100%; height: 160px; object-fit: cover; cursor: pointer; transition: transform 0.2s; }
 .card img:hover { transform: scale(1.05); }
 .card .meta { padding: 8px; font-size: 14px; color: #aaa; }
@@ -38,10 +45,15 @@ button:hover { background: #1c7ed6; }
 .card .meta { display: none; }
 body.show-meta .card .meta { display: block; }
 .date-taken { font-size: 12px; color: #888; margin-bottom: 6px; }
-.meta-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.like-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 0; display: flex; align-items: center; gap: 4px; color: white; transition: opacity 0.2s; }
-.like-btn:hover { transform: scale(1.1); }
-.like-count { font-size: 12px; color: #aaa; }
+.meta-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; justify-content: end; }
+
+.like-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 0; display: flex; align-items: center; gap: 4px; transition: opacity 0.2s; }
+.like-btn:hover { color: rgb(233, 149, 149); }
+.like-count { font-size: 12px; }
+
+.comment-count { display: flex; align-items: center; gap: 4px; font-size: 12px;}
+/* .comment-count i { color: white; } */
+
 .meta-actions { display: flex; gap: 6px; margin-top: 4px; }
 .meta-actions button { padding: 4px 8px; font-size: 12px; }
 .edit-btn { background: gray }
@@ -49,10 +61,14 @@ body.show-meta .card .meta { display: block; }
 .delete-btn { background: gray }
 .delete-btn:hover { background: #e53935; }
 
+.mobile-close-btn { display: none; }
+
 @media (max-width: 768px) {
   header { gap: 10px; position: sticky; top: 0; z-index: 1002; background: #111; }
   .mobile-menu-toggle { display: inline-flex !important; align-items: center; justify-content: center; padding: 8px 12px; background: #333; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; }
   .mobile-menu-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 1000; display: none; }
+  .mobile-close-btn { display: block; align-self: flex-end; background: none; border: none; color: #999; cursor: pointer; font-size: 24px; padding: 4px 8px; margin-bottom: 8px; }
+  .mobile-close-btn:hover { color: #fff; }
   .header-actions {
     display: none;
     position: fixed;
@@ -119,7 +135,7 @@ body.show-meta .card .meta { display: block; }
   background-color: #da190b;
 } */
 
-.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); }
+.modal { display: none; position: fixed; z-index: 1005; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); }
 .modal.show { display: flex; align-items: center; justify-content: center; }
 .modal-content { max-width: 90%; max-height: 90%; object-fit: contain; }
 .modal-close { position: absolute; top: 20px; right: 40px; color: #fff; font-size: 40px; font-weight: bold; cursor: pointer; }
@@ -129,11 +145,47 @@ body.show-meta .card .meta { display: block; }
 .modal-prev { left: 20px; }
 .modal-next { right: 20px; }
 #modalCaption { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: #ccc; font-size: 16px; text-align: center; }
+.toggle-comments-btn { position: absolute; bottom: 20px; right: 20px; padding: 8px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; z-index: 1001; transition: background 0.15s; }
+.toggle-comments-btn:hover { background: #666; }
+.toggle-comments-btn.has-comments { background: #1e90ff; }
+.toggle-comments-btn.has-comments:hover { background: #1c7ed6; }
+.comments-overlay { position: absolute; bottom: 0; right: 0; width: 300px; height: 100%; background: rgba(0, 0, 0, 0.85); border-left: 1px solid #444; display: none; flex-direction: column; z-index: 1003; }
+.comments-overlay.show { display: flex; }
+.comments-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #444; padding-bottom: 8px; }
+.comments-container { display: flex; flex-direction: column; height: 100%; padding: 16px; color: #eee; font-size: 13px;}
+.comments-container h3 { margin: 0; font-size: 14px; }
+.close-comments-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 18px; padding: 0; }
+.close-comments-btn:hover { color: #ddd; }
+.comments-list { flex: 1; overflow-y: auto; margin-bottom: 12px; }
+.comment-item { position: relative; margin-bottom: 12px; padding: 12px 12px 10px 12px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; }
+.comment-menu { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #bbb; cursor: pointer; font-size: 16px; padding: 4px; line-height: 1; }
+.comment-menu:hover { color: #fff; }
+.comment-author { font-weight: bold; font-size: 12px; color: #1e90ff; margin-bottom: 4px; }
+.comment-time { font-size: 11px; color: #999; margin-bottom: 6px; }
+.comment-text { font-size: 12px; line-height: 1.4; color: #ddd; word-break: break-word; }
+.comment-delete { display: none; position: absolute; top: 8px; right: 34px; background: none; border: none; color: #e53935; cursor: pointer; font-size: 12px; padding: 4px; line-height: 1; }
+.comment-delete:hover { color: #ff6f60; }
+.comment-item.show-delete .comment-delete { display: inline-block; }
+.comment-item.show-delete .comment-menu { opacity: 0.6; }
+.comment-form { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #444; padding-top: 8px; }
+.comment-form input { padding: 6px; background: #333; color: #eee; border: 1px solid #555; border-radius: 3px; font-size: 12px; }
+.comment-form textarea { padding: 6px; background: #333; color: #eee; border: 1px solid #555; border-radius: 3px; font-size: 12px; resize: none; font-family: inherit; }
+.comment-form button { padding: 6px; background: #1e90ff; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.comment-form button:hover { background: #1c7ed6; }
 .modal-box { background: #222; padding: 24px; border-radius: 8px; min-width: 300px; }
 .modal-box h2 { margin-top: 0; }
 .modal-box input { width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #444; background: #333; color: #eee; border-radius: 4px; }
 .modal-box form { display: flex; flex-direction: column; }
 #loginError { color: #f44336; margin-top: 8px; font-size: 14px; }
+.user-stats { margin: 20px 0; }
+.stat-row { display: flex; justify-content: space-between; padding: 12px; background: #1a1a1a; border-radius: 4px; margin-bottom: 8px; }
+.stat-row .stat-label { color: #aaa; font-size: 14px; }
+.stat-row .stat-value { color: #1e90ff; font-weight: bold; font-size: 14px; }
+.user-actions { display: flex; gap: 8px; margin-top: 16px; }
+.delete-account-btn { background: #e53935; flex: 1; }
+.delete-account-btn:hover { background: #c62828; }
+.header-user { cursor: pointer; }
+.header-user:hover { color: #1e90ff; }
 
 .admin-dashboard { position: relative; background: #1a1a1a; padding: 24px; min-height: calc(100vh - 200px); }
 .admin-dashboard h2 { margin-top: 0; margin-bottom: 24px; }
@@ -154,6 +206,20 @@ body.show-meta .card .meta { display: block; }
 .dashboard-table tr:hover { background: #2a2a2a; }
 .delete-user-btn { padding: 6px 10px; font-size: 12px; background: #e53935; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .delete-user-btn:hover { background: #c62828; }
+.approve-user-btn { padding: 6px 10px; font-size: 12px; background: #4caf50; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; }
+.approve-user-btn:hover { background: #43a047; }
+.reject-user-btn { padding: 6px 10px; font-size: 12px; background: #e53935; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+.reject-user-btn:hover { background: #c62828; }
+.no-pending { padding: 16px; text-align: center; color: #888; font-style: italic; }
+.delete-comment-btn { padding: 6px 10px; font-size: 12px; background: #e53935; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+.delete-comment-btn:hover { background: #c62828; }
+.edit-album-btn { padding: 6px 10px; font-size: 12px; background: #1e90ff; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; }
+.edit-album-btn:hover { background: #1c7ed6; }
+.delete-album-btn { padding: 6px 10px; font-size: 12px; background: #e53935; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+.delete-album-btn:hover { background: #c62828; }
+
+.footer { padding: 24px 16px; text-align: center; border-top: 1px solid #333; background: #0a0a0a; color: #888; font-size: 13px; margin-top: auto; }
+.footer p { margin: 0; }
 
 @media (max-width: 768px) {
   .admin-dashboard { padding: 18px 16px 32px; }
