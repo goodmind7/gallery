@@ -217,6 +217,30 @@ body.show-meta .card .meta { display: block; }
 .edit-album-btn:hover { background: #1c7ed6; }
 .delete-album-btn { padding: 6px 10px; font-size: 12px; background: #e53935; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .delete-album-btn:hover { background: #c62828; }
+/* Lock badge shown on private album thumbnails for unauthenticated users */
+.lock-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 12px;
+  padding: 4px 6px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.lock-badge i { font-size: 12px; opacity: 0.9; }
+
+.toggle-switch { position: relative; display: inline-block; width: 48px; height: 24px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; cursor: pointer; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #666; transition: 0.3s; border-radius: 24px; }
+.toggle-slider::before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: 0.3s; border-radius: 50%; }
+.toggle-switch input:checked ~ .toggle-slider { background-color: #4caf50; }
+.toggle-switch input:checked ~ .toggle-slider::before { transform: translateX(24px); }
+.toggle-slider:hover { opacity: 0.9; }
 
 .footer { padding: 24px 16px; text-align: center; border-top: 1px solid #333; background: #0a0a0a; color: #888; font-size: 13px; margin-top: auto; }
 .footer p { margin: 0; }
@@ -225,3 +249,9 @@ body.show-meta .card .meta { display: block; }
   .admin-dashboard { padding: 18px 16px 32px; }
   .close-dashboard-btn { top: 12px; right: 12px; padding: 8px 12px; }
 }
+
+.toggle-public-btn { padding: 6px 12px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+.toggle-public-btn.is-public { background: #4caf50; color: white; }
+.toggle-public-btn.is-public:hover { background: #45a049; }
+.toggle-public-btn.is-private { background: #f44336; color: white; }
+.toggle-public-btn.is-private:hover { background: #da190b; }

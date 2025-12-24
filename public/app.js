@@ -221,9 +221,24 @@ async function fetchImages() {
       const img = document.createElement('img');
       img.src = `/uploads/thumbs/${it.filename}`;
       img.alt = it.title || it.filename;
-      img.onclick = () => openModal(items.indexOf(it), it.title || it.filename);
+      // Disable opening modal for private albums when not authenticated
+      const isPrivateAlbum = (it.album_public === 0 || it.album_public === false);
+      if (isPrivateAlbum && !isAuthenticated) {
+        img.style.cursor = 'not-allowed';
+        img.title = 'Private album — login to view';
+        img.onclick = (e) => { e.preventDefault(); openLoginModal(); };
+      } else {
+        img.onclick = () => openModal(items.indexOf(it), it.title || it.filename);
+      }
       img.onerror = () => { img.src = `/uploads/${it.filename}`; };
       card.appendChild(img);
+      // Show lock badge for private album thumbnails to unauthenticated users
+      if (isPrivateAlbum && !isAuthenticated) {
+        const lockBadge = document.createElement('div');
+        lockBadge.className = 'lock-badge';
+        lockBadge.innerHTML = '<i class="fa-solid fa-lock"></i>';
+        card.appendChild(lockBadge);
+      }
       
       const meta = document.createElement('div');
       meta.className = 'meta';
@@ -298,6 +313,12 @@ function openModal(indexOrSrc, caption) {
   if (typeof indexOrSrc === 'number') {
     currentImageIndex = indexOrSrc;
     const image = allImages[currentImageIndex];
+    // Block opening private album image for unauthenticated users
+    const isPrivateAlbum = (image.album_public === 0 || image.album_public === false);
+    if (isPrivateAlbum && !isAuthenticated) {
+      openLoginModal();
+      return;
+    }
     modalImg.src = `/uploads/${image.filename}`;
     modalCaption.textContent = image.title || image.filename;
     modalImg.dataset.imageId = image.id;
@@ -317,20 +338,33 @@ function openModal(indexOrSrc, caption) {
 }
 
 function prevImage() {
-  if (currentImageIndex > 0) {
-    currentImageIndex--;
-    const image = allImages[currentImageIndex];
-    document.getElementById('modalImg').src = `/uploads/${image.filename}`;
-    document.getElementById('modalCaption').textContent = image.title || image.filename;
+  if (currentImageIndex <= 0) return;
+  let idx = currentImageIndex - 1;
+  while (idx >= 0) {
+    const candidate = allImages[idx];
+    const isPrivateAlbum = (candidate.album_public === 0 || candidate.album_public === false);
+    if (!(isPrivateAlbum && !isAuthenticated)) {
+      currentImageIndex = idx;
+      document.getElementById('modalImg').src = `/uploads/${candidate.filename}`;
+      document.getElementById('modalCaption').textContent = candidate.title || candidate.filename;
+      return;
+    }
+    idx--;
   }
 }
 
 function nextImage() {
-  if (currentImageIndex < allImages.length - 1) {
-    currentImageIndex++;
-    const image = allImages[currentImageIndex];
-    document.getElementById('modalImg').src = `/uploads/${image.filename}`;
-    document.getElementById('modalCaption').textContent = image.title || image.filename;
+  let idx = currentImageIndex + 1;
+  while (idx < allImages.length) {
+    const candidate = allImages[idx];
+    const isPrivateAlbum = (candidate.album_public === 0 || candidate.album_public === false);
+    if (!(isPrivateAlbum && !isAuthenticated)) {
+      currentImageIndex = idx;
+      document.getElementById('modalImg').src = `/uploads/${candidate.filename}`;
+      document.getElementById('modalCaption').textContent = candidate.title || candidate.filename;
+      return;
+    }
+    idx++;
   }
 }
 
@@ -883,16 +917,22 @@ async function openDashboard() {
     albumsManagement.innerHTML = `
       <table class="dashboard-table">
         <thead>
-          <tr><th>ID</th><th>Name</th><th>Created</th><th>Actions</th></tr>
+          <tr><th>ID</th><th>Name</th><th>Public</th><th>Created</th><th>Actions</th></tr>
         </thead>
         <tbody>
           ${albums.map(a => `
             <tr>
               <td>${a.id}</td>
               <td>${a.name}</td>
+              <td>
+                <label class="toggle-switch">
+                  <input type="checkbox" ${a.is_public ? 'checked' : ''} onchange="toggleAlbumPublic(this, ${a.id}, '${a.name.replace(/'/g, "\\'")}')">
+                  <span class="toggle-slider"></span>
+                </label>
+              </td>
               <td>${new Date(a.created_at).toLocaleString()}</td>
               <td>
-                <button class="edit-album-btn" onclick="editAlbum(${a.id}, '${a.name.replace(/'/g, "\\'")}')">Edit</button>
+                <button class="edit-album-btn" onclick="editAlbumName(${a.id}, '${a.name.replace(/'/g, "\\'")}')">Edit Name</button>
                 <button class="delete-album-btn" onclick="deleteAlbum(${a.id})">Delete</button>
               </td>
             </tr>
@@ -1021,7 +1061,7 @@ async function deleteCommentAdmin(commentId) {
   }
 }
 
-async function editAlbum(albumId, currentName) {
+async function editAlbumName(albumId, currentName) {
   const newName = prompt('Enter new album name:', currentName);
   if (newName === null || newName.trim() === '') return;
   
@@ -1041,6 +1081,30 @@ async function editAlbum(albumId, currentName) {
     }
   } catch (e) {
     alert('Error: ' + e.message);
+  }
+}
+
+async function toggleAlbumPublic(el, albumId, albumName) {
+  // Checkbox-based slider: derive new state from `checked`
+  const isCheckbox = el && el.tagName === 'INPUT';
+  const newIsPublic = isCheckbox ? !!el.checked : true;
+
+  try {
+    const res = await fetch(`/api/albums/${albumId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name: albumName, is_public: newIsPublic })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert('Toggle failed: ' + (err.error || res.statusText));
+      // Revert checkbox on failure
+      if (isCheckbox) el.checked = !newIsPublic;
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+    if (isCheckbox) el.checked = !newIsPublic;
   }
 }
 

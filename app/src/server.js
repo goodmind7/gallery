@@ -26,10 +26,61 @@ const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'
 fs.mkdirSync(uploadDir, { recursive: true });
 const thumbsDir = path.join(uploadDir, 'thumbs');
 fs.mkdirSync(thumbsDir, { recursive: true });
-app.use('/uploads', express.static(uploadDir));
 
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
+
+// Protected file serving for uploads (including thumbs)
+app.get('/uploads/*', async (req, res) => {
+  try {
+    const relPath = req.params[0]; // e.g., 'thumbs/file.jpg' or 'file.jpg'
+    if (!relPath) return res.status(400).json({ error: 'Missing file path' });
+
+    // Prevent path traversal
+    const safePath = path.normalize(relPath).replace(/^\.\/+/, '');
+    const absPath = path.join(uploadDir, safePath);
+    if (!absPath.startsWith(uploadDir)) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+
+    // Always allow thumbnails to be publicly viewable
+    if (relPath.startsWith('thumbs/')) {
+      if (!fs.existsSync(absPath)) return res.status(404).json({ error: 'Not found' });
+      return res.sendFile(absPath);
+    }
+
+    const baseName = path.basename(relPath); // use filename to look up DB record
+
+    const pool = getPool();
+    const [rows] = await pool.query(
+      `SELECT i.id, i.album_id, a.is_public AS album_public
+       FROM images i
+       LEFT JOIN albums a ON a.id = i.album_id
+       WHERE i.filename = ?
+       LIMIT 1`,
+      [baseName]
+    );
+
+    const img = rows && rows[0];
+    const isPrivateAlbum = img && img.album_public === 0;
+    const isPublicAlbum = img && img.album_public === 1;
+    const isOrphan = img && img.album_id === null; // treat no-album images as public
+    const loggedIn = !!(req.session && req.session.authenticated);
+
+    const allowed = !img || isPublicAlbum || isOrphan || loggedIn;
+    if (!allowed) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!fs.existsSync(absPath)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    return res.sendFile(absPath);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to serve file' });
+  }
+});
 
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) {
@@ -163,6 +214,8 @@ app.put('/api/albums/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { name, is_public } = req.body;
   
+  console.log('PUT /api/albums/:id', { id, name, is_public });
+  
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Album name is required' });
   }
@@ -183,9 +236,12 @@ app.put('/api/albums/:id', requireAuth, async (req, res) => {
       params.push(is_public ? 1 : 0);
     }
     params.push(id);
-    await pool.query(`UPDATE albums SET ${updates.join(', ')} WHERE id = ?`, params);
+    console.log('Query:', `UPDATE albums SET ${updates.join(', ')} WHERE id = ?`, params);
+    const result = await pool.query(`UPDATE albums SET ${updates.join(', ')} WHERE id = ?`, params);
+    console.log('Update result:', result);
     res.json({ message: 'Album updated successfully' });
   } catch (err) {
+    console.error('Error updating album:', err);
     res.status(500).json({ error: 'Failed to update album' });
   }
 });
@@ -287,14 +343,14 @@ app.get('/api/images', async (req, res) => {
     let order = (req.query.order || 'desc').toString().toLowerCase() === 'asc' ? 'ASC' : 'DESC';
     const allowedSorts = new Set(['created_at', 'date_taken', 'title', 'like_count']);
     if (!allowedSorts.has(sort)) sort = 'created_at';
-
-    let query = 'SELECT i.id, i.album_id, i.user_id, i.filename, i.title, i.date_taken, i.created_at, COUNT(l.id) as like_count, (SELECT COUNT(*) FROM comments c WHERE c.image_id = i.id) AS comment_count';
+    // Include album public flag
+    let query = 'SELECT i.id, i.album_id, i.user_id, i.filename, i.title, i.date_taken, i.created_at, COUNT(l.id) as like_count, (SELECT COUNT(*) FROM comments c WHERE c.image_id = i.id) AS comment_count, MAX(a.is_public) AS album_public';
     let params = [];
     if (userId) {
       query += ', MAX(CASE WHEN l.user_id = ? THEN 1 ELSE 0 END) as user_liked';
       params.push(userId);
     }
-    query += ' FROM images i LEFT JOIN likes l ON i.id = l.image_id';
+    query += ' FROM images i LEFT JOIN likes l ON i.id = l.image_id LEFT JOIN albums a ON a.id = i.album_id';
     if (albumId) {
       query += ' WHERE i.album_id = ?';
       params.push(albumId);
