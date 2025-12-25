@@ -22,6 +22,18 @@ app.use(session({
 }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// Ensure DB schema upgrades (idempotent)
+async function ensureSchema() {
+  try {
+    const pool = getPool();
+    await pool.query('ALTER TABLE images ADD COLUMN IF NOT EXISTS description TEXT NULL');
+  } catch (e) {
+    // Ignore if DB not ready or lacks permissions; routes may error until fixed
+    console.log('Schema check: ', e.message);
+  }
+}
+ensureSchema();
+
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 const thumbsDir = path.join(uploadDir, 'thumbs');
@@ -189,7 +201,13 @@ app.get('/api/admin/stats', async (req, res) => {
 app.get('/api/albums', async (req, res) => {
   try {
     const pool = getPool();
-    const [rows] = await pool.query('SELECT id, name, is_public, created_at FROM albums ORDER BY created_at DESC');
+    const [rows] = await pool.query(
+      `SELECT a.id, a.name, a.is_public, a.created_at, COUNT(i.id) as image_count
+       FROM albums a
+       LEFT JOIN images i ON a.id = i.album_id
+       GROUP BY a.id, a.name, a.is_public, a.created_at
+       ORDER BY a.created_at DESC`
+    );
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: 'DB error', details: e.message });
@@ -344,7 +362,7 @@ app.get('/api/images', async (req, res) => {
     const allowedSorts = new Set(['created_at', 'date_taken', 'title', 'like_count']);
     if (!allowedSorts.has(sort)) sort = 'created_at';
     // Include album public flag
-    let query = 'SELECT i.id, i.album_id, i.user_id, i.filename, i.title, i.date_taken, i.created_at, COUNT(l.id) as like_count, (SELECT COUNT(*) FROM comments c WHERE c.image_id = i.id) AS comment_count, MAX(a.is_public) AS album_public';
+    let query = 'SELECT i.id, i.album_id, i.user_id, i.filename, i.title, i.description, i.date_taken, i.created_at, COUNT(l.id) as like_count, (SELECT COUNT(*) FROM comments c WHERE c.image_id = i.id) AS comment_count, MAX(a.is_public) AS album_public';
     let params = [];
     if (userId) {
       query += ', MAX(CASE WHEN l.user_id = ? THEN 1 ELSE 0 END) as user_liked';
@@ -520,8 +538,9 @@ app.post('/api/images', upload.single('image'), async (req, res) => {
 
     const pool = getPool();
     const uploaderId = (req.session && req.session.userId) || null;
-    await pool.query('INSERT INTO images (album_id, user_id, filename, title, date_taken) VALUES (?, ?, ?, ?, ?)', [albumId, uploaderId, file.filename, title, dateTaken]);
-    res.status(201).json({ filename: file.filename, title, album_id: albumId, date_taken: dateTaken });
+    const description = req.body.description || null;
+    await pool.query('INSERT INTO images (album_id, user_id, filename, title, description, date_taken) VALUES (?, ?, ?, ?, ?, ?)', [albumId, uploaderId, file.filename, title, description, dateTaken]);
+    res.status(201).json({ filename: file.filename, title, description, album_id: albumId, date_taken: dateTaken });
   } catch (e) {
     res.status(500).json({ error: 'Upload failed', details: e.message });
   }
@@ -582,7 +601,7 @@ app.post('/api/admin/thumbnails/regenerate', async (req, res) => {
 
 app.put('/api/images/:id', requireAuth, async (req, res) => {
   try {
-    const { title } = req.body;
+    const { title, description } = req.body;
     const pool = getPool();
     const [rows] = await pool.query('SELECT user_id FROM images WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Image not found' });
@@ -592,7 +611,13 @@ app.put('/api/images/:id', requireAuth, async (req, res) => {
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ error: 'You do not have permission to edit this image' });
     }
-    await pool.query('UPDATE images SET title = ? WHERE id = ?', [title, req.params.id]);
+    const fields = [];
+    const params = [];
+    if (title !== undefined) { fields.push('title = ?'); params.push(title); }
+    if (description !== undefined) { fields.push('description = ?'); params.push(description); }
+    if (fields.length === 0) { return res.status(400).json({ error: 'No fields to update' }); }
+    params.push(req.params.id);
+    await pool.query(`UPDATE images SET ${fields.join(', ')} WHERE id = ?`, params);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: 'Update failed', details: e.message });

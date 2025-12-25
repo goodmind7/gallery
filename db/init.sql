@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS images (
   user_id INT,
   filename VARCHAR(255) NOT NULL,
   title VARCHAR(255),
+  description TEXT,
   date_taken DATETIME,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL,

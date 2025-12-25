@@ -14,6 +14,7 @@
     <div class="header-actions">
       <button class="mobile-close-btn" onclick="closeMobileMenu()" title="Close">✕</button>
       <span id="userDisplay" class="header-user" style="display:none;"></span>
+   
       <!-- 상세정보 -->
       <button id="toggleMetaBtn" class="header-btn" title="Show/Hide Info">
         <i class="fa-solid fa-circle-info"></i><span class="btn-label"> Info</span>
@@ -25,6 +26,9 @@
       <button id="toggleUploadBtn" class="header-btn" title="Hide Upload">
         <i class="fa-regular fa-square-plus"></i><span class="btn-label"> Upload</span>
       </button>
+      <!-- Dark Mode Toggle -->
+      <button id="darkModeToggle" class="header-btn" type="button" title="Toggle Dark/Light Mode">
+        <i id="darkModeIcon" class="fa-solid fa-moon"></i><span class="btn-label"> Dark Mode</span>
       </button>
       <!-- 로그인/로그아웃 -->
       <button id="loginBtn" class="header-btn" title="Login">
@@ -178,7 +182,10 @@
       <h2>Create Album</h2>
       <form id="createAlbumForm">
         <input type="text" id="albumName" placeholder="Album name" required />
-        <label class="checkbox-row"><input type="checkbox" id="albumPublic" checked /> Public album</label>
+         <label class="checkbox-row">
+           <input type="checkbox" id="albumPublic" checked />
+           Public Album
+         </label>
         <button type="submit">Create</button>
         <button type="button" class="cancel-btn" onclick="closeCreateAlbumModal()">Cancel</button>
       </form>
@@ -222,6 +229,7 @@
           <option value="">No Album</option>
         </select>
         <input type="text" name="title" placeholder="Title" />
+        <textarea name="description" placeholder="Description (optional)" rows="3" style="margin: 8px 0; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;"></textarea>
         <input type="date" name="date_taken" placeholder="Date taken (optional)" />
         <input type="file" name="image" accept="image/*" required />
         <button type="submit">Upload</button>

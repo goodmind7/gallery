@@ -8,10 +8,41 @@ let sortKey = 'created_at';
 let sortOrder = 'desc';
 let commentAuthorAutoFilled = false;
 let gallerySize = 'medium';
+let darkMode = localStorage.getItem('darkMode') === 'light' ? false : true; // true = dark mode, false = light mode
 
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
 const headerActions = document.querySelector('.header-actions');
+
+// Initialize dark mode on page load
+function initDarkMode() {
+  if (!darkMode) {
+    document.body.classList.add('light-mode');
+  }
+  const toggle = document.getElementById('darkModeToggle');
+  const icon = document.getElementById('darkModeIcon');
+  if (icon) {
+    icon.className = 'fa-solid ' + (darkMode ? 'fa-moon' : 'fa-sun');
+  }
+  if (toggle) {
+    toggle.addEventListener('click', toggleDarkMode);
+  }
+}
+
+function toggleDarkMode() {
+  darkMode = !darkMode;
+  if (darkMode) {
+    document.body.classList.remove('light-mode');
+    localStorage.setItem('darkMode', 'dark');
+  } else {
+    document.body.classList.add('light-mode');
+    localStorage.setItem('darkMode', 'light');
+  }
+  const icon = document.getElementById('darkModeIcon');
+  if (icon) {
+    icon.className = 'fa-solid ' + (darkMode ? 'fa-moon' : 'fa-sun');
+  }
+}
 
 function openMobileMenu() {
   document.body.classList.add('mobile-menu-open');
@@ -42,6 +73,10 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('resize', () => {
   if (window.innerWidth > 768) closeMobileMenu();
 });
+
+// Initialize dark mode and auth on page load
+initDarkMode();
+checkAuth();
 
 async function checkAuth() {
   try {
@@ -148,10 +183,21 @@ async function fetchAlbums() {
       
       const btn = document.createElement('button');
       btn.className = 'album-btn';
-      btn.textContent = album.name;
       btn.type = 'button';
       btn.onclick = () => selectAlbum(album.id);
       btn.dataset.albumId = album.id;
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = album.name;
+      btn.appendChild(nameSpan);
+      
+      if (album.image_count !== undefined) {
+        const badge = document.createElement('span');
+        badge.className = 'album-count-badge';
+        badge.textContent = album.image_count;
+        btn.appendChild(badge);
+      }
+      
       list.appendChild(btn);
     }
   } catch (e) {
@@ -224,7 +270,7 @@ async function fetchImages() {
       // Disable opening modal for private albums when not authenticated
       const isPrivateAlbum = (it.album_public === 0 || it.album_public === false);
       if (isPrivateAlbum && !isAuthenticated) {
-        img.style.cursor = 'not-allowed';
+        img.style.cursor = 'default';
         img.title = 'Private album — login to view';
         img.onclick = (e) => { e.preventDefault(); openLoginModal(); };
       } else {
@@ -246,6 +292,15 @@ async function fetchImages() {
       title.style.marginBottom = '4px';
       title.textContent = it.title || it.filename;
       meta.appendChild(title);
+      // if (it.description) {
+      //   const desc = document.createElement('div');
+      //   desc.className = 'description';
+      //   desc.textContent = it.description;
+      //   desc.style.fontSize = '12px';
+      //   desc.style.color = '#999';
+      //   desc.style.marginBottom = '6px';
+      //   meta.appendChild(desc);
+      // }
       
       if (it.date_taken) {
         const dateTaken = document.createElement('div');
@@ -320,7 +375,13 @@ function openModal(indexOrSrc, caption) {
       return;
     }
     modalImg.src = `/uploads/${image.filename}`;
-    modalCaption.textContent = image.title || image.filename;
+    const titleText = image.title || image.filename;
+    const descText = (image.description || '').trim();
+    if (descText) {
+      modalCaption.innerHTML = `<span class="caption-title">${escapeHtml(titleText)}</span> <span class="caption-desc">${escapeHtml(descText)}</span>`;
+    } else {
+      modalCaption.innerHTML = `<span class="caption-title">${escapeHtml(titleText)}</span>`;
+    }
     modalImg.dataset.imageId = image.id;
     prefillCommentAuthor();
     setCommentButtonState(!!image.comment_count);
@@ -346,7 +407,16 @@ function prevImage() {
     if (!(isPrivateAlbum && !isAuthenticated)) {
       currentImageIndex = idx;
       document.getElementById('modalImg').src = `/uploads/${candidate.filename}`;
-      document.getElementById('modalCaption').textContent = candidate.title || candidate.filename;
+      {
+        const t = candidate.title || candidate.filename;
+        const d = (candidate.description || '').trim();
+        const cap = document.getElementById('modalCaption');
+        if (d) {
+          cap.innerHTML = `<span class="caption-title">${escapeHtml(t)}</span> <span class="caption-desc">${escapeHtml(d)}</span>`;
+        } else {
+          cap.innerHTML = `<span class="caption-title">${escapeHtml(t)}</span>`;
+        }
+      }
       return;
     }
     idx--;
@@ -361,7 +431,16 @@ function nextImage() {
     if (!(isPrivateAlbum && !isAuthenticated)) {
       currentImageIndex = idx;
       document.getElementById('modalImg').src = `/uploads/${candidate.filename}`;
-      document.getElementById('modalCaption').textContent = candidate.title || candidate.filename;
+      {
+        const t = candidate.title || candidate.filename;
+        const d = (candidate.description || '').trim();
+        const cap = document.getElementById('modalCaption');
+        if (d) {
+          cap.innerHTML = `<span class="caption-title">${escapeHtml(t)}</span> <span class="caption-desc">${escapeHtml(d)}</span>`;
+        } else {
+          cap.innerHTML = `<span class="caption-title">${escapeHtml(t)}</span>`;
+        }
+      }
       return;
     }
     idx++;
@@ -544,12 +623,14 @@ async function deleteImage(id) {
 async function editImage(item) {
   const newTitle = prompt('Edit title:', item.title || item.filename);
   if (newTitle === null) return;
+  const newDesc = prompt('Edit description (optional):', item.description || '');
+  if (newDesc === null) return;
   try {
     const res = await fetch(`/api/images/${item.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ title: newTitle })
+      body: JSON.stringify({ title: newTitle, description: newDesc })
     });
     if (res.ok) {
       await fetchImages();
