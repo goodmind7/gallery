@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Gallery</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="/styles.css?v=2" />
 </head>
@@ -13,16 +14,26 @@
     <button id="mobileMenuBtn" class="header-btn mobile-menu-toggle" aria-label="Menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
     <div class="header-actions">
       <button class="mobile-close-btn" onclick="closeMobileMenu()" title="Close">✕</button>
+      <!-- Desktop-only Search -->
+      <div class="search-wrapper desktop-only">
+        <input type="text" id="searchInputDesktop" class="search-input" placeholder="Search titles..." />
+        <button id="searchClearBtnDesktop" class="search-clear" type="button" title="Clear">✕</button>
+      </div>
+      <!-- Mobile-only Search -->
+      <div class="search-wrapper mobile-only">
+        <input type="text" id="searchInputMobile" class="search-input" placeholder="Search titles..." />
+        <button id="searchClearBtnMobile" class="search-clear" type="button" title="Clear">✕</button>
+      </div>
       <span id="userDisplay" class="header-user" style="display:none;"></span>
    
-      <!-- 상세정보 -->
+      <!-- Meta Info -->
       <button id="toggleMetaBtn" class="header-btn" title="Show/Hide Info">
         <i class="fa-solid fa-circle-info"></i><span class="btn-label"> Info</span>
       </button>
-      <!-- 앨범 추가 -->
+      <!-- Add Album -->
       <button id="createAlbumBtn" class="header-btn create-album-btn" style="display:none;" title="New Album">
         <i class="fa-solid fa-folder-plus"></i><span class="btn-label"> New Album</span>      
-      <!-- 이미지 업로드 토글 -->
+      <!-- Toggle Image Upload -->
       <button id="toggleUploadBtn" class="header-btn" title="Hide Upload">
         <i class="fa-regular fa-square-plus"></i><span class="btn-label"> Upload</span>
       </button>
@@ -30,7 +41,7 @@
       <button id="darkModeToggle" class="header-btn" type="button" title="Toggle Dark/Light Mode">
         <i id="darkModeIcon" class="fa-solid fa-moon"></i><span class="btn-label"> Dark Mode</span>
       </button>
-      <!-- 로그인/로그아웃 -->
+      <!-- Login/Logout -->
       <button id="loginBtn" class="header-btn" title="Login">
         <i class="fa-solid fa-right-to-bracket"></i><span class="btn-label"> Login</span>
       </button>
@@ -40,8 +51,10 @@
     </div>
   </header>
 
+  <!-- Mobile Menu Overlay -->
   <div id="mobileMenuOverlay" class="mobile-menu-overlay"></div>
 
+  <!-- Admin Dashboard -->
   <section id="adminDashboard" class="admin-dashboard" style="display:none;">
     <h2>Dashboard</h2>
     <button class="close-dashboard-btn" onclick="closeDashboard()">✕ Close</button>
@@ -96,8 +109,10 @@
   
   </section>
 
+  <!-- Sort Section -->
   <section class="sort-section">
     <div class="sort-bar">
+      
       <div class="size-controls" aria-label="Card size">
         <button type="button" class="size-btn" data-size="small" title="Small">S</button>
         <button type="button" class="size-btn" data-size="medium" title="Medium">M</button>
@@ -121,6 +136,7 @@
     </div>
   </section>
 
+  <!-- Gallery -->
   <section class="gallery" id="gallery">
   </section>
 
@@ -147,6 +163,7 @@
     </div>
   </div>
 
+  <!-- Login Modal -->
   <div id="loginModal" class="modal">
     <div class="modal-box">
       <h2>Login</h2>
@@ -163,6 +180,7 @@
     </div>
   </div>
 
+  <!-- Signup Modal -->
   <div id="signupModal" class="modal">
     <div class="modal-box">
       <h2>Sign Up</h2>
@@ -177,6 +195,7 @@
     </div>
   </div>
 
+  <!-- Create Album Modal -->
   <div id="createAlbumModal" class="modal">
     <div class="modal-box">
       <h2>Create Album</h2>
@@ -193,6 +212,7 @@
     </div>
   </div>
 
+  <!-- User Dashboard Modal -->
   <div id="userDashboardModal" class="modal">
     <div class="modal-box">
       <h2>My Account</h2>
@@ -221,6 +241,7 @@
     </div>
   </div>
 
+  <!-- Upload Modal -->
   <div id="uploadModal" class="modal">
     <div class="modal-box">
       <h2>Upload Image</h2>
@@ -239,6 +260,7 @@
     </div>
   </div>
 
+  <!-- Footer -->
   <footer class="footer">
     <p>&copy; 2025 <a href="mailto:iyfhan@gmail.com" style="text-decoration: none; color: #888;">Han</a>'s Gallery. All rights reserved.</p>
   </footer>

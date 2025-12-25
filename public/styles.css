@@ -42,12 +42,22 @@ header { padding: 16px; border-bottom: 1px solid var(--border-color); display: f
 .albums-bar { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px; align-items: stretch; background: var(--bg-primary); }
 .albums-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
 #albumSelect { margin-bottom: 10px; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; }
-.sort-section { padding: 10px 12px; } 
-.sort-bar { display: flex; justify-content: flex-end; }
+.sort-section { padding: 10px 12px; display: flex; justify-content: flex-end; } 
+.sort-bar { display: flex; justify-content: flex-end; gap: 16px; align-items: center; }
+.search-wrapper { position: relative; display: inline-flex; align-items: center; }
+.search-input { padding: 8px 12px; padding-right: 32px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; width: 250px; font-size: 14px; }
+.search-input::placeholder { color: var(--text-tertiary); }
+.search-input:focus { outline: none; border-color: var(--accent-color); }
+.search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 16px; padding: 0 4px; display: none; }
+.search-clear:hover { color: var(--text-primary); }
 .sort-controls { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 14px; }
 .sort-controls select { padding: 8px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; }
 .size-controls { display: inline-flex; align-items: center; gap: 6px; margin: 0 12px; }
 .size-btn { padding: 6px 9px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 12px; transition: background-color 0.2s; }
+/* Mobile-only search wrapper default: hidden on desktop */
+.mobile-only { display: none; width: 100%; }
+/* Desktop-only search wrapper: visible by default */
+.desktop-only { display: flex; width: 100%; }
 .size-btn:hover { background: var(--bg-tertiary); }
 .size-btn.active { background: var(--accent-color); border-color: var(--accent-color); color: white; }
 .album-btn { padding: 8px 16px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; transition: background-color 0.2s, border-color 0.2s; }
@@ -69,6 +79,122 @@ button:hover { background: var(--accent-hover); }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; padding: 16px; flex: 1; align-content: start; }
 .gallery.size-small { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 .gallery.size-large { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+/* Album cards */
+.album-card {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  height: 160px;
+  display: flex;
+  flex-direction: column;
+}
+
+.album-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: var(--accent-color);
+}
+
+/* Skeleton loading state */
+.album-card.skeleton {
+  cursor: default;
+  pointer-events: none;
+  animation: pulse 1.5s ease-in-out infinite;
+  height: 160px;
+}
+
+.album-card.skeleton::before {
+  content: '';
+  display: block;
+  height: 100%;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+}
+
+.album-card.skeleton::after {
+  content: '';
+  display: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Fade-in animation */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.album-cover {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.album-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.7) 50%, rgba(0, 0, 0, 0.9) 100%);
+  z-index: 2;
+}
+
+.album-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.album-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.album-meta i {
+  font-size: 12px;
+}
+
 .card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; position: relative; height: fit-content; transition: border-color 0.3s; }
 .card img { display: block; width: 100%; height: 160px; object-fit: cover; cursor: pointer; transition: transform 0.2s; }
 .card img:hover { transform: scale(1.05); }
@@ -121,6 +247,11 @@ body.show-meta .card .meta { display: block; }
   }
   body.mobile-menu-open .header-actions { display: flex; transform: translateX(0); }
   body.mobile-menu-open .mobile-menu-overlay { display: block; }
+  .sort-bar { gap: 10px; }
+  .search-input { width: 100%; }
+  /* Show mobile drawer search and hide desktop search on small screens */
+  .desktop-only { display: none; }
+  .mobile-only { display: flex; margin-bottom: 8px; }
   .header-actions .header-btn { width: 100%; text-align: left; justify-content: flex-start; }
   .btn-label { display: inline; }
 }

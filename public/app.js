@@ -1,11 +1,19 @@
 let isAuthenticated = false;
 let selectedAlbumId = null;
+let viewMode = 'albums'; // 'images' or 'albums'
 let currentUser = null; // {id, email} or {admin: true}
 let allImages = []; // Track all images for modal navigation
+let allAlbums = []; // Track all albums with cover images
 let currentImageIndex = -1; // Current image in modal
 let showMeta = false; // Controls visibility of meta section
 let sortKey = 'created_at';
 let sortOrder = 'desc';
+let albumsLoadPromise = null; // Tracks in-flight album fetch
+// Pagination
+let pageSize = 60;
+let currentPage = 0;
+let hasMore = false;
+let searchQuery = ''; // Current search query
 let commentAuthorAutoFilled = false;
 let gallerySize = 'medium';
 let darkMode = localStorage.getItem('darkMode') === 'light' ? false : true; // true = dark mode, false = light mode
@@ -88,6 +96,9 @@ async function checkAuth() {
     updateMetaToggleUI();
     prefillCommentAuthor();
     await fetchAlbums();
+    if (viewMode === 'albums') {
+      await renderAlbumCards();
+    }
   } catch (e) {
     isAuthenticated = false;
     currentUser = null;
@@ -166,50 +177,71 @@ function closeUploadModal() {
 }
 
 async function fetchAlbums() {
-  try {
-    const res = await fetch('/api/albums');
-    const albums = await res.json();
-    const select = document.getElementById('albumSelect');
-    const list = document.getElementById('albumsList');
-    
-    select.innerHTML = '<option value="">No Album</option>';
-    list.innerHTML = '<button class="album-btn active" onclick="selectAlbum(null)">All</button>';
-    
-    for (const album of albums) {
-      const opt = document.createElement('option');
-      opt.value = album.id;
-      opt.textContent = album.name;
-      select.appendChild(opt);
+  albumsLoadPromise = (async () => {
+    try {
+      const res = await fetch('/api/albums');
+      const albums = await res.json();
+      allAlbums = albums; // Cache albums with cover_image
+      const select = document.getElementById('albumSelect');
+      const list = document.getElementById('albumsList');
       
-      const btn = document.createElement('button');
-      btn.className = 'album-btn';
-      btn.type = 'button';
-      btn.onclick = () => selectAlbum(album.id);
-      btn.dataset.albumId = album.id;
+      select.innerHTML = '<option value="">No Album</option>';
+      list.innerHTML = '<button class="album-btn active" onclick="showAlbumsView()"><i class="fa-solid fa-folder"></i> Albums</button><button class="album-btn" onclick="selectAlbum(null)">All</button>';
       
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = album.name;
-      btn.appendChild(nameSpan);
-      
-      if (album.image_count !== undefined) {
-        const badge = document.createElement('span');
-        badge.className = 'album-count-badge';
-        badge.textContent = album.image_count;
-        btn.appendChild(badge);
+      for (const album of albums) {
+        const opt = document.createElement('option');
+        opt.value = album.id;
+        opt.textContent = album.name;
+        select.appendChild(opt);
+        
+        const btn = document.createElement('button');
+        btn.className = 'album-btn';
+        btn.type = 'button';
+        btn.onclick = () => selectAlbum(album.id);
+        btn.dataset.albumId = album.id;
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = album.name;
+        btn.appendChild(nameSpan);
+        
+        // Commented out album count badge - keep logic for future use
+        // if (album.image_count !== undefined) {
+        //   const badge = document.createElement('span');
+        //   badge.className = 'album-count-badge';
+        //   badge.textContent = album.image_count;
+        //   btn.appendChild(badge);
+        // }
+        
+        list.appendChild(btn);
       }
-      
-      list.appendChild(btn);
+    } catch (e) {
+      console.error('Error fetching albums:', e);
     }
-  } catch (e) {
-    console.error('Error fetching albums:', e);
-  }
+  })();
+  return albumsLoadPromise;
+}
+
+function showAlbumsView() {
+  viewMode = 'albums';
+  selectedAlbumId = null;
+  document.querySelectorAll('.album-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.textContent.includes('Albums')) {
+      btn.classList.add('active');
+    }
+  });
+  renderAlbumCards();
 }
 
 function selectAlbum(albumId) {
   selectedAlbumId = albumId;
+  viewMode = 'images';
+  // Reset pagination when switching albums
+  currentPage = 0;
+  hasMore = false;
   document.querySelectorAll('.album-btn').forEach(btn => {
     btn.classList.remove('active');
-    if ((albumId === null && btn.textContent === 'All') || 
+    if ((albumId === null && btn.textContent.includes('All')) || 
         (albumId !== null && parseInt(btn.dataset.albumId) === albumId)) {
       btn.classList.add('active');
     }
@@ -217,14 +249,106 @@ function selectAlbum(albumId) {
   fetchImages();
 }
 
+
+
+async function renderAlbumCards() {
+  const el = document.getElementById('gallery');
+  
+  // Show loading skeleton
+  el.innerHTML = `
+    <div class="album-card skeleton"></div>
+    <div class="album-card skeleton"></div>
+    <div class="album-card skeleton"></div>
+    <div class="album-card skeleton"></div>
+  `;
+  
+  try {
+    // Refetch to ensure cover_image is current (in case images were added/deleted)
+    const res = await fetch('/api/albums');
+    const albums = await res.json();
+    allAlbums = albums; // Update cache
+    
+    // Small delay to prevent flashing if load is very fast
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    el.innerHTML = '';
+    
+    if (albums.length === 0) {
+      el.innerHTML = '<p style="padding: 16px; color: var(--text-secondary);">No albums yet</p>';
+      return;
+    }
+    
+    for (const album of albums) {
+      const card = document.createElement('div');
+      card.className = 'album-card fade-in';
+      card.onclick = () => selectAlbum(album.id);
+      
+      const cover = document.createElement('div');
+      cover.className = 'album-cover';
+      // Use first image as cover if available, otherwise show folder icon
+      if (album.cover_image) {
+        const img = document.createElement('img');
+        img.src = `/uploads/thumbs/${album.cover_image}`;
+        img.alt = album.name;
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+        img.onerror = () => {
+          // Fallback to folder icon if image fails to load
+          cover.innerHTML = '<i class="fa-solid fa-folder" style="font-size: 48px; color: var(--accent-color);"></i>';
+        };
+        cover.appendChild(img);
+      } else {
+        cover.innerHTML = '<i class="fa-solid fa-folder" style="font-size: 48px; color: var(--accent-color);"></i>';
+      }
+      card.appendChild(cover);
+      
+      const info = document.createElement('div');
+      info.className = 'album-info';
+      
+      const title = document.createElement('div');
+      title.className = 'album-title';
+      title.textContent = album.name;
+      info.appendChild(title);
+      
+      const meta = document.createElement('div');
+      meta.className = 'album-meta';
+      const count = document.createElement('span');
+      count.innerHTML = `<i class="fa-regular fa-image"></i> ${album.image_count || 0}`;
+      meta.appendChild(count);
+      
+      const privacy = document.createElement('span');
+      privacy.innerHTML = album.is_public ? '<i class="fa-solid fa-globe"></i> Public' : '<i class="fa-solid fa-lock"></i> Private';
+      meta.appendChild(privacy);
+      
+      info.appendChild(meta);
+      card.appendChild(info);
+      el.appendChild(card);
+    }
+  } catch (e) {
+    console.error('Error rendering albums:', e);
+    el.innerHTML = '<p style="padding: 16px; color: var(--text-secondary);">Error loading albums</p>';
+  }
+}
+
 async function fetchImages() {
   try {
+    if (albumsLoadPromise) {
+      try {
+        await albumsLoadPromise;
+      } catch (err) {
+        console.warn('Continuing despite album load failure', err);
+      }
+    }
     const params = new URLSearchParams();
     if (selectedAlbumId !== null && selectedAlbumId !== undefined) {
       params.set('album_id', selectedAlbumId);
     }
     params.set('sort', sortKey);
     params.set('order', sortOrder);
+    // Apply pagination for large image sets
+    params.set('limit', String(pageSize));
+    params.set('offset', String(currentPage * pageSize));
     const url = `/api/images${params.toString() ? `?${params.toString()}` : ''}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -250,109 +374,19 @@ async function fetchImages() {
         return (sortOrder === 'asc') ? (da - db) : (db - da);
       });
     }
-    const el = document.getElementById('gallery');
-    el.innerHTML = '';
-    
-    allImages = items;
-    
-    if (items.length === 0) {
-      el.innerHTML = '<p style="padding: 16px; color: #aaa;">No images</p>';
-      return;
+    // Merge pagination results into allImages
+    if (currentPage === 0) {
+      allImages = items;
+    } else {
+      allImages = allImages.concat(items);
     }
+    // Determine if more pages likely exist
+    hasMore = items.length === pageSize;
     
-    for (const it of items) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      
-      const img = document.createElement('img');
-      img.src = `/uploads/thumbs/${it.filename}`;
-      img.alt = it.title || it.filename;
-      // Disable opening modal for private albums when not authenticated
-      const isPrivateAlbum = (it.album_public === 0 || it.album_public === false);
-      if (isPrivateAlbum && !isAuthenticated) {
-        img.style.cursor = 'default';
-        img.title = 'Private album — login to view';
-        img.onclick = (e) => { e.preventDefault(); openLoginModal(); };
-      } else {
-        img.onclick = () => openModal(items.indexOf(it), it.title || it.filename);
-      }
-      img.onerror = () => { img.src = `/uploads/${it.filename}`; };
-      card.appendChild(img);
-      // Show lock badge for private album thumbnails to unauthenticated users
-      if (isPrivateAlbum && !isAuthenticated) {
-        const lockBadge = document.createElement('div');
-        lockBadge.className = 'lock-badge';
-        lockBadge.innerHTML = '<i class="fa-solid fa-lock"></i>';
-        card.appendChild(lockBadge);
-      }
-      
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      const title = document.createElement('div');
-      title.style.marginBottom = '4px';
-      title.textContent = it.title || it.filename;
-      meta.appendChild(title);
-      // if (it.description) {
-      //   const desc = document.createElement('div');
-      //   desc.className = 'description';
-      //   desc.textContent = it.description;
-      //   desc.style.fontSize = '12px';
-      //   desc.style.color = '#999';
-      //   desc.style.marginBottom = '6px';
-      //   meta.appendChild(desc);
-      // }
-      
-      if (it.date_taken) {
-        const dateTaken = document.createElement('div');
-        dateTaken.className = 'date-taken';
-        dateTaken.innerHTML = '<i class="fa-regular fa-calendar"></i> ' + new Date(it.date_taken).toLocaleDateString();
-        meta.appendChild(dateTaken);
-      }
-      
-      const metaBar = document.createElement('div');
-      metaBar.className = 'meta-bar';
-      
-      // Like button
-      const likeBtn = document.createElement('button');
-      likeBtn.className = 'like-btn';
-      likeBtn.innerHTML = `<i class="fa-regular fa-heart"></i> <span class="like-count">${it.like_count || 0}</span>`;
-      likeBtn.style.opacity = it.user_liked ? '1' : '0.5';
-      likeBtn.onclick = (e) => { e.stopPropagation(); toggleLike(it.id, likeBtn); };
-      metaBar.appendChild(likeBtn);
-
-      // Comment count display
-      const commentCount = document.createElement('div');
-      commentCount.className = 'comment-count';
-      commentCount.innerHTML = `<i class="fa-solid fa-comments"></i> <span>${it.comment_count || 0}</span>`;
-      metaBar.appendChild(commentCount);
-      
-      meta.appendChild(metaBar);
-      
-      if (isAuthenticated) {
-        const isAdmin = currentUser?.admin === true;
-        const isOwner = it.user_id && currentUser?.id && it.user_id === currentUser.id;
-        const canEdit = isAdmin || isOwner;
-        
-        if (canEdit) {
-          const actions = document.createElement('div');
-          actions.className = 'meta-actions';
-          const editBtn = document.createElement('button');
-          editBtn.className = 'edit-btn';
-          editBtn.textContent = 'Edit';
-          editBtn.onclick = (e) => { e.stopPropagation(); editImage(it); };
-          const delBtn = document.createElement('button');
-          delBtn.className = 'delete-btn';
-          delBtn.textContent = 'Delete';
-          delBtn.onclick = (e) => { e.stopPropagation(); deleteImage(it.id); };
-          actions.appendChild(editBtn);
-          actions.appendChild(delBtn);
-          meta.appendChild(actions);
-        }
-      }
-      
-      card.appendChild(meta);
-      el.appendChild(card);
-    }
+    // Render according to current search
+    applySearch();
+    // Update Load More control visibility
+    updateLoadMoreUI();
   } catch (e) {
     console.error('Error fetching images:', e);
     document.getElementById('gallery').innerHTML = '<p style="padding: 16px; color: #aaa;">Error loading images</p>';
@@ -571,6 +605,163 @@ function toggleCommentDelete(btn) {
   if (item) {
     item.classList.toggle('show-delete');
   }
+}
+
+function countKoreanCharacters(str) {
+  // Match only complete Hangul syllables (U+AC00 to U+D7A3)
+  // This ignores incomplete jamo characters during composition
+  const koreanRegex = /[\uAC00-\uD7A3]/g;
+  const matches = str.match(koreanRegex);
+  return matches ? matches.length : 0;
+}
+
+function filterImages(query) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) {
+    return allImages;
+  }
+  
+  // Check if at least 2 Korean characters are present
+  const koreanCharCount = countKoreanCharacters(trimmedQuery);
+  
+  // If any Korean detected but less than 2 complete syllables, return empty
+  // This prevents showing all images during incomplete Korean input
+  if (trimmedQuery.match(/[\uAC00-\uD7A3\u1100-\u11FF]/)) {
+    if (koreanCharCount < 2) {
+      return []; // Return empty array for incomplete Korean input
+    }
+  }
+  
+  const lowerQuery = trimmedQuery.toLowerCase();
+  return allImages.filter(img => {
+    const title = (img.title || '').toLowerCase();
+    return title.includes(lowerQuery);
+  });
+}
+
+function renderGalleryImages(items) {
+  const el = document.getElementById('gallery');
+  el.innerHTML = '';
+  
+  if (items.length === 0) {
+    el.innerHTML = '<p style="padding: 16px; color: #aaa;">No images found</p>';
+    return;
+  }
+  
+  for (const it of items) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    
+    const img = document.createElement('img');
+    img.src = `/uploads/thumbs/${it.filename}`;
+    img.alt = it.title || it.filename;
+    const isPrivateAlbum = (it.album_public === 0 || it.album_public === false);
+    if (isPrivateAlbum && !isAuthenticated) {
+      img.style.cursor = 'default';
+      img.title = 'Private album — login to view';
+      img.onclick = (e) => { e.preventDefault(); openLoginModal(); };
+    } else {
+      img.onclick = () => openModal(allImages.indexOf(it), it.title || it.filename);
+    }
+    img.onerror = () => { img.src = `/uploads/${it.filename}`; };
+    card.appendChild(img);
+    if (isPrivateAlbum && !isAuthenticated) {
+      const lockBadge = document.createElement('div');
+      lockBadge.className = 'lock-badge';
+      lockBadge.innerHTML = '<i class="fa-solid fa-lock"></i>';
+      card.appendChild(lockBadge);
+    }
+    
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const title = document.createElement('div');
+    title.style.marginBottom = '4px';
+    title.textContent = it.title || it.filename;
+    meta.appendChild(title);
+    
+    if (it.date_taken) {
+      const dateTaken = document.createElement('div');
+      dateTaken.className = 'date-taken';
+      dateTaken.innerHTML = '<i class="fa-regular fa-calendar"></i> ' + new Date(it.date_taken).toLocaleDateString();
+      meta.appendChild(dateTaken);
+    }
+    
+    const metaBar = document.createElement('div');
+    metaBar.className = 'meta-bar';
+    
+    const likeBtn = document.createElement('button');
+    likeBtn.className = 'like-btn';
+    likeBtn.innerHTML = `<i class="fa-regular fa-heart"></i> <span class="like-count">${it.like_count || 0}</span>`;
+    likeBtn.style.opacity = it.user_liked ? '1' : '0.5';
+    likeBtn.onclick = (e) => { e.stopPropagation(); toggleLike(it.id, likeBtn); };
+    metaBar.appendChild(likeBtn);
+
+    const commentCount = document.createElement('div');
+    commentCount.className = 'comment-count';
+    commentCount.innerHTML = `<i class="fa-solid fa-comments"></i> <span>${it.comment_count || 0}</span>`;
+    metaBar.appendChild(commentCount);
+    
+    meta.appendChild(metaBar);
+    
+    if (isAuthenticated) {
+      const isAdmin = currentUser?.admin === true;
+      const isOwner = it.user_id && currentUser?.id && it.user_id === currentUser.id;
+      const canEdit = isAdmin || isOwner;
+      
+      if (canEdit) {
+        const actions = document.createElement('div');
+        actions.className = 'meta-actions';
+        const editBtn = document.createElement('button');
+        editBtn.className = 'edit-btn';
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = (e) => { e.stopPropagation(); editImage(it); };
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = (e) => { e.stopPropagation(); deleteImage(it.id); };
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        meta.appendChild(actions);
+      }
+    }
+    
+    card.appendChild(meta);
+    el.appendChild(card);
+  }
+}
+
+function applySearch() {
+  const filtered = filterImages(searchQuery);
+  renderGalleryImages(filtered);
+}
+
+function updateLoadMoreUI() {
+  // Only show Load More in image view
+  if (viewMode !== 'images') return;
+  // Only show when looking at All or album pagination; hide when no more
+  const galleryEl = document.getElementById('gallery');
+  if (!galleryEl) return;
+  let btn = document.getElementById('loadMoreBtn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'loadMoreBtn';
+    btn.className = 'header-btn';
+    btn.style.margin = '16px auto';
+    btn.style.display = 'block';
+    btn.innerHTML = '<i class="fa-solid fa-plus"></i> <span class="btn-label"> Load More</span>';
+    btn.onclick = () => loadMore();
+    // Insert after gallery
+    const parent = galleryEl.parentNode;
+    if (parent) parent.insertBefore(btn, galleryEl.nextSibling);
+  }
+  // Hide if searching (to avoid confusion) or no more items
+  const shouldShow = searchQuery.trim() === '' && hasMore;
+  btn.style.display = shouldShow ? 'block' : 'none';
+}
+
+function loadMore() {
+  currentPage += 1;
+  fetchImages();
 }
 
 function escapeHtml(text) {
@@ -890,6 +1081,9 @@ if (sortSelectEl) {
     const v = sortSelectEl.value;
     setSortFromValue(v);
     localStorage.setItem('gallery_sort', v);
+    // Reset pagination on sort change
+    currentPage = 0;
+    hasMore = false;
     fetchImages();
   });
 }
@@ -1212,3 +1406,51 @@ async function deleteAlbum(albumId) {
 checkAuth();
 fetchImages();
 updateMetaToggleUI();
+
+// Search functionality (desktop + mobile)
+const searchInputDesktop = document.getElementById('searchInputDesktop');
+const searchClearBtnDesktop = document.getElementById('searchClearBtnDesktop');
+const searchInputMobile = document.getElementById('searchInputMobile');
+const searchClearBtnMobile = document.getElementById('searchClearBtnMobile');
+
+function setSearchInputValue(val) {
+  if (searchInputDesktop) searchInputDesktop.value = val;
+  if (searchInputMobile) searchInputMobile.value = val;
+  searchQuery = val;
+}
+
+function updateClearVisibilityFor(inputEl, clearBtnEl) {
+  if (!inputEl || !clearBtnEl) return;
+  const hasText = !!inputEl.value.trim();
+  clearBtnEl.style.display = hasText ? 'inline-flex' : 'none';
+}
+
+function addSearchHandlers(inputEl, clearBtnEl) {
+  if (!inputEl) return;
+  // Handle Korean text composition
+  inputEl.addEventListener('compositionend', (e) => {
+    setSearchInputValue(e.target.value);
+    applySearch();
+    updateClearVisibilityFor(inputEl, clearBtnEl);
+  });
+  // Handle regular input
+  inputEl.addEventListener('input', (e) => {
+    setSearchInputValue(e.target.value);
+    applySearch();
+    updateClearVisibilityFor(inputEl, clearBtnEl);
+  });
+  // Clear button
+  if (clearBtnEl) {
+    clearBtnEl.addEventListener('click', () => {
+      setSearchInputValue('');
+      applySearch();
+      updateClearVisibilityFor(inputEl, clearBtnEl);
+      inputEl.focus();
+    });
+    // Initialize visibility
+    updateClearVisibilityFor(inputEl, clearBtnEl);
+  }
+}
+
+addSearchHandlers(searchInputDesktop, searchClearBtnDesktop);
+addSearchHandlers(searchInputMobile, searchClearBtnMobile);

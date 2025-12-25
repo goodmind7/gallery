@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <style>
+      .bg { fill: #1e90ff; }
+      .frame { fill: none; stroke: white; stroke-width: 16; stroke-linejoin: round; }
+      .circle { fill: white; }
+      .mountain { fill: white; }
+    </style>
+  </defs>
+  <!-- Background -->
+  <rect class="bg" width="192" height="192" rx="32"/>
+  
+  <!-- Frame/Border -->
+  <rect class="frame" x="24" y="24" width="144" height="144" rx="8"/>
+  
+  <!-- Circle (sun/detail) -->
+  <circle class="circle" cx="128" cy="56" r="16"/>
+  
+  <!-- Mountain/Landscape shape -->
+  <polygon class="mountain" points="24,128 72,72 120,104 168,56 168,168 24,168"/>
+</svg>

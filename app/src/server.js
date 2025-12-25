@@ -208,6 +208,14 @@ app.get('/api/albums', async (req, res) => {
        GROUP BY a.id, a.name, a.is_public, a.created_at
        ORDER BY a.created_at DESC`
     );
+    // Fetch random image filename for each album to use as cover
+    for (const album of rows) {
+      const [randomImage] = await pool.query(
+        'SELECT filename FROM images WHERE album_id = ? ORDER BY RAND() LIMIT 1',
+        [album.id]
+      );
+      album.cover_image = randomImage && randomImage.length > 0 ? randomImage[0].filename : null;
+    }
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: 'DB error', details: e.message });
@@ -356,6 +364,14 @@ app.get('/api/images', async (req, res) => {
     const pool = getPool();
     const albumId = req.query.album_id ? parseInt(req.query.album_id) : null;
     const userId = (req.session && req.session.userId) || null;
+    // Pagination
+    let limit = req.query.limit ? parseInt(req.query.limit) : null;
+    let offset = req.query.offset ? parseInt(req.query.offset) : 0;
+    if (Number.isNaN(limit) || limit === null || limit <= 0) limit = null; // no limit by default
+    if (Number.isNaN(offset) || offset < 0) offset = 0;
+    // Cap limit to avoid huge responses
+    const MAX_LIMIT = 200;
+    if (limit && limit > MAX_LIMIT) limit = MAX_LIMIT;
     // Sorting allowlist
     let sort = (req.query.sort || 'created_at').toString();
     let order = (req.query.order || 'desc').toString().toLowerCase() === 'asc' ? 'ASC' : 'DESC';
@@ -390,6 +406,12 @@ app.get('/api/images', async (req, res) => {
       // created_at default
       query += ` GROUP BY i.id ORDER BY i.created_at ${order}, i.id DESC`;
     }
+    // Apply LIMIT/OFFSET if provided
+    if (limit !== null) {
+      query += ' LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+    }
+
     const [rows] = await pool.query(query, params);
     res.json(rows);
   } catch (e) {
