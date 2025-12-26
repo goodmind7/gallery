@@ -8,7 +8,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - ./data/mysql:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "3306:3306"
@@ -19,7 +19,7 @@ services:
       retries: 10
 
   app:
-    build: ./app
+    image: iyfhan/gallery-app:1.0.0
     environment:
       DB_HOST: db
       DB_PORT: 3306
@@ -49,3 +49,7 @@ services:
 networks:
   default:
     driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local

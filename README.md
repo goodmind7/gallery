@@ -64,3 +64,73 @@ docker compose down
 ## Troubleshooting
 - If `db` is not healthy, ensure the environment variables are correct and the NAS allows container networking.
 - Check volume permissions if uploads fail (`data/uploads` must be writable).
+
+## Publish to Docker Hub (App Image)
+
+- Login:
+```bash
+docker login
+```
+- Build the app image:
+```bash
+docker build -t iyfhan/gallery-app:latest app
+```
+- Push:
+```bash
+docker push iyfhan/gallery-app:latest
+```
+
+## Release Tags
+
+- Build and push a versioned tag (e.g., 1.0.0):
+```bash
+docker build -t iyfhan/gallery-app:1.0.0 app
+docker push iyfhan/gallery-app:1.0.0
+```
+- The production compose pins the app image to `iyfhan/gallery-app:1.0.0` for reproducible deploys. To upgrade:
+```bash
+# build & push new tag
+docker build -t iyfhan/gallery-app:1.0.1 app
+docker push iyfhan/gallery-app:1.0.1
+
+# update docker-compose.prod.yml image to iyfhan/gallery-app:1.0.1
+# then redeploy
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+## Run on PC (Production Compose)
+
+1. Copy the project folder or clone it to your PC.
+2. Create `.env` from the example and edit secrets:
+```bash
+cp .env.example .env
+```
+3. Start with the production compose:
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+4. Visit `http://localhost:8080`.
+
+Note: Production MySQL is pinned to `8.0.40` in `docker-compose.prod.yml` to avoid unexpected upgrades. To change versions, update the image tag and re-create the DB volume (see reset steps below).
+
+### Nginx Version Pin
+- Both dev and prod compose files pin nginx to `nginx:1.27-alpine` to avoid surprise upgrades.
+- To upgrade nginx:
+```bash
+# edit docker-compose*.yml to a new tag, e.g., nginx:1.27.2-alpine
+docker compose pull
+docker compose up -d
+```
+
+### MySQL Initialization Notes
+- The production compose uses a named volume `mysql_data` so the database initializes cleanly from `db/init.sql` on first run.
+- If you previously mounted `./data/mysql`, the init script will NOT run because the data directory isn’t empty.
+- To reset safely:
+```bash
+docker compose down
+mv data/mysql data/mysql.backup-$(date +%F)
+docker volume rm $(docker volume ls -q | grep mysql_data) || true
+docker compose -f docker-compose.prod.yml up -d
+```
+This will allow MySQL to initialize fresh and apply `db/init.sql`.
