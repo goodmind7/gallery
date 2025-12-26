@@ -14,17 +14,25 @@
     <button id="mobileMenuBtn" class="header-btn mobile-menu-toggle" aria-label="Menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
     <div class="header-actions">
       <button class="mobile-close-btn" onclick="closeMobileMenu()" title="Close">✕</button>
+
+      <!-- User Name -->
+      <span id="userDisplay" class="header-user" style="display:none;"></span>
+
       <!-- Desktop-only Search -->
       <div class="search-wrapper desktop-only">
         <input type="text" id="searchInputDesktop" class="search-input" placeholder="Search titles..." />
         <button id="searchClearBtnDesktop" class="search-clear" type="button" title="Clear">✕</button>
       </div>
+      <!-- Search Toggle Button (Desktop Only) -->
+      <button id="toggleSearchBtn" class="header-btn" title="Toggle Search">
+        <i class="fa-solid fa-magnifying-glass"></i><span class="btn-label"> Search</span>
+      </button>
       <!-- Mobile-only Search -->
       <div class="search-wrapper mobile-only">
         <input type="text" id="searchInputMobile" class="search-input" placeholder="Search titles..." />
         <button id="searchClearBtnMobile" class="search-clear" type="button" title="Clear">✕</button>
       </div>
-      <span id="userDisplay" class="header-user" style="display:none;"></span>
+      
    
       <!-- Meta Info -->
       <button id="toggleMetaBtn" class="header-btn" title="Show/Hide Info">

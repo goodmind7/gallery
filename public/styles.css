@@ -31,7 +31,7 @@ header { padding: 16px; border-bottom: 1px solid var(--border-color); display: f
 .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .mobile-menu-toggle { display: none !important; }
 .mobile-menu-overlay { display: none; }
-.header-user { color: var(--text-secondary); font-size: 14px; display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.header-user { width:20%; color: var(--text-secondary); font-size: 14px; display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 /* .header-user::before { content: "\f2bd "; font-family: "Font Awesome 6 Free"; font-weight: 400; opacity: 0.9; } */
 .header-btn { padding: 8px 12px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; transition: background-color 0.2s, border-color 0.2s; }
 .header-btn:hover { background: var(--bg-tertiary); }
@@ -56,8 +56,8 @@ header { padding: 16px; border-bottom: 1px solid var(--border-color); display: f
 .size-btn { padding: 6px 9px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 12px; transition: background-color 0.2s; }
 /* Mobile-only search wrapper default: hidden on desktop */
 .mobile-only { display: none; width: 100%; }
-/* Desktop-only search wrapper: visible by default */
-.desktop-only { display: flex; width: 100%; }
+/* Desktop-only search wrapper: hidden by default */
+.desktop-only { display: none; width: 100%; }
 .size-btn:hover { background: var(--bg-tertiary); }
 .size-btn.active { background: var(--accent-color); border-color: var(--accent-color); color: white; }
 .album-btn { padding: 8px 16px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; transition: background-color 0.2s, border-color 0.2s; }
@@ -252,6 +252,7 @@ body.show-meta .card .meta { display: block; }
   /* Show mobile drawer search and hide desktop search on small screens */
   .desktop-only { display: none; }
   .mobile-only { display: flex; margin-bottom: 8px; }
+  #toggleSearchBtn { display: none; }
   .header-actions .header-btn { width: 100%; text-align: left; justify-content: flex-start; }
   .btn-label { display: inline; }
 }

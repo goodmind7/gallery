@@ -1454,3 +1454,18 @@ function addSearchHandlers(inputEl, clearBtnEl) {
 
 addSearchHandlers(searchInputDesktop, searchClearBtnDesktop);
 addSearchHandlers(searchInputMobile, searchClearBtnMobile);
+
+// Toggle search functionality
+const toggleSearchBtn = document.getElementById('toggleSearchBtn');
+const searchWrapperDesktop = document.querySelector('.search-wrapper.desktop-only');
+
+if (toggleSearchBtn && searchWrapperDesktop) {
+  toggleSearchBtn.addEventListener('click', () => {
+    const computedDisplay = window.getComputedStyle(searchWrapperDesktop).display;
+    const isHidden = computedDisplay === 'none';
+    searchWrapperDesktop.style.display = isHidden ? 'inline-flex' : 'none';
+    if (isHidden && searchInputDesktop) {
+      searchInputDesktop.focus();
+    }
+  });
+}
